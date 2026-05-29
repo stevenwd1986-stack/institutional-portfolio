@@ -2,8 +2,47 @@ import { useNavigate }  from "react-router-dom";
 import { useWrappers }  from "../../hooks/useWrappers";
 import { fmt, fmtPct }  from "../../lib/utils";
 import { cn }           from "../../lib/utils";
-import { ChevronRight, Archive, Layers } from "lucide-react";
+import { ChevronRight, Archive, Layers, FileText } from "lucide-react";
 import type { WrapperSummary } from "../../hooks/useWrappers";
+
+// ── Platform logo marks ───────────────────────────────────────────────────────
+
+function TransactLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className="shrink-0">
+      <rect width="48" height="48" rx="10" fill="#00843D" />
+      <path d="M12 16 H36 M24 16 V34" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M19 28 L24 34 L29 28" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function FinioLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className="shrink-0">
+      <rect width="48" height="48" rx="10" fill="#4F46E5" />
+      <path d="M14 12 H34 M14 12 V36 M14 24 H28" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function GenericPlatformLogo({ size = 18 }: { size?: number }) {
+  return (
+    <span
+      className="shrink-0 rounded-md bg-slate-400 flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <FileText className="text-white" style={{ width: size * 0.6, height: size * 0.6 }} />
+    </span>
+  );
+}
+
+function PlatformLogo({ platform, size = 18 }: { platform: string; size?: number }) {
+  const p = platform.toUpperCase();
+  if (p.includes("TRANSACT")) return <TransactLogo size={size} />;
+  if (p.includes("FINIO"))    return <FinioLogo    size={size} />;
+  return <GenericPlatformLogo size={size} />;
+}
 
 // ── Style config — light palette ──────────────────────────────────────────────
 
@@ -58,7 +97,10 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
           </span>
           <span className="text-[10px] text-slate-500 bg-[#F1F5F9] px-1.5 py-0.5 rounded">Closed</span>
         </div>
-        <p className="text-xs font-medium text-slate-500">{w.platform}</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <PlatformLogo platform={w.platform} size={14} />
+          <p className="text-xs font-medium text-slate-500">{w.platform}</p>
+        </div>
         {w.transfer_note && (
           <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{w.transfer_note}</p>
         )}
@@ -85,10 +127,11 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
         <span className={cn("text-xs font-bold uppercase tracking-wide", style.accent)}>
           {style.label}
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-slate-500 bg-white/60 px-1.5 py-0.5 rounded font-medium border border-[#E2E8F0]">
-            {w.platform}
-          </span>
+
+        {/* Platform badge with logo */}
+        <div className="flex items-center gap-1.5 bg-white/70 border border-[#E2E8F0] rounded-lg px-2 py-1 shadow-sm">
+          <PlatformLogo platform={w.platform} size={14} />
+          <span className="text-[11px] font-medium text-slate-600">{w.platform}</span>
           <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-[#002147] transition-colors" />
         </div>
       </div>
@@ -141,13 +184,15 @@ function PlatformGroup({
   wrappers:  WrapperSummary[];
   clientId:  string;
 }) {
-  const total = wrappers.filter((w) => !w.is_closed).reduce((s, w) => s + w.value, 0);
+  const total     = wrappers.filter((w) => !w.is_closed).reduce((s, w) => s + w.value, 0);
   const hasClosed = wrappers.some((w) => w.is_closed);
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{platform}</span>
+      {/* Platform group header with logo */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <PlatformLogo platform={platform} size={20} />
+        <span className="text-sm font-semibold text-[#0F172A]">{platform}</span>
         {total > 0 && (
           <span className="text-xs text-slate-500 tabular-nums font-medium">{fmt(total)}</span>
         )}
@@ -156,6 +201,7 @@ function PlatformGroup({
         )}
         <div className="flex-1 h-px bg-[#E2E8F0]" />
       </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {wrappers.map((w) => (
           <WrapperCard key={w.id} w={w} clientId={clientId} />
@@ -179,9 +225,21 @@ export function WrapperCards({ clientId }: { clientId: string }) {
   const singlePlatform = groups.size === 1;
 
   if (singlePlatform) {
+    // Still show the platform header even when single platform
+    const [[platform, ws]] = [...groups.entries()];
     return (
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {wrappers.map((w) => <WrapperCard key={w.id} w={w} clientId={clientId} />)}
+      <div>
+        <div className="flex items-center gap-2.5 mb-3">
+          <PlatformLogo platform={platform} size={20} />
+          <span className="text-sm font-semibold text-[#0F172A]">{platform}</span>
+          <span className="text-xs text-slate-500 tabular-nums font-medium">
+            {fmt(ws.filter((w) => !w.is_closed).reduce((s, w) => s + w.value, 0))}
+          </span>
+          <div className="flex-1 h-px bg-[#E2E8F0]" />
+        </div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {wrappers.map((w) => <WrapperCard key={w.id} w={w} clientId={clientId} />)}
+        </div>
       </div>
     );
   }

@@ -1,10 +1,93 @@
 import { useRef, useState, useCallback } from "react";
-import { Upload, FileText, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Upload, FileText, CheckCircle2, XCircle, Clock,
+  AlertTriangle, ChevronDown, ChevronRight, ArrowRight,
+} from "lucide-react";
 import { PageShell }     from "../components/shared/PageShell";
 import { useImportJobs, useUploadCSV } from "../hooks/useImportJobs";
 import type { ImportJob, ImportStatus } from "../hooks/useImportJobs";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/button";
+
+// ── Provider definitions ──────────────────────────────────────────────────────
+
+type Source = "CSV" | "FINIO" | "TRANSACT";
+
+interface ProviderDef {
+  id:          Source;
+  name:        string;
+  tagline:     string;
+  description: string;
+  badge?:      string;
+  logo:        React.ReactNode;
+}
+
+// Transact logo mark — green brand
+function TransactMark() {
+  return (
+    <div className="relative w-12 h-12 shrink-0">
+      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
+        <rect width="48" height="48" rx="10" fill="#00843D" />
+        {/* Stylised "T" with upward arrow */}
+        <path d="M12 16 H36 M24 16 V34" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M19 28 L24 34 L29 28" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+// Finio logo mark — deep purple brand
+function FinioMark() {
+  return (
+    <div className="relative w-12 h-12 shrink-0">
+      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
+        <rect width="48" height="48" rx="10" fill="#4F46E5" />
+        {/* "F" letterform */}
+        <path d="M14 12 H34 M14 12 V36 M14 24 H28" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+// Generic CSV logo mark — slate
+function CsvMark() {
+  return (
+    <div className="relative w-12 h-12 shrink-0">
+      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
+        <rect width="48" height="48" rx="10" fill="#475569" />
+        {/* Document lines */}
+        <path d="M16 10 H28 L38 20 V40 H16 V10Z" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M28 10 V20 H38" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M20 27 H32 M20 32 H28" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+      </svg>
+    </div>
+  );
+}
+
+const PROVIDERS: ProviderDef[] = [
+  {
+    id:          "TRANSACT",
+    name:        "Transact",
+    tagline:     "Platform transactions",
+    description: "Standard transaction exports from Transact. Trade Date, ISIN, Quantity and Price columns auto-detected.",
+    badge:       "Most used",
+    logo:        <TransactMark />,
+  },
+  {
+    id:          "FINIO",
+    name:        "Finio",
+    tagline:     "Back-office exports",
+    description: "Valuation and transaction exports from Finio adviser back-office. tradeDate / unitPrice format supported.",
+    logo:        <FinioMark />,
+  },
+  {
+    id:          "CSV",
+    name:        "Generic CSV",
+    tagline:     "Any CSV format",
+    description: "Import any CSV with a header row. Use the column mapping tool to match your columns to the required fields.",
+    logo:        <CsvMark />,
+  },
+];
 
 // ── Column mapping ────────────────────────────────────────────────────────────
 
@@ -25,10 +108,10 @@ type CanonicalKey = typeof CANONICAL_FIELDS[number]["key"];
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<ImportStatus, { label: string; icon: React.ComponentType<{ className?: string }>; classes: string }> = {
-  PENDING:    { label: "Pending",    icon: Clock,          classes: "text-slate-500 bg-slate-100"        },
-  PROCESSING: { label: "Processing", icon: Clock,          classes: "text-blue-600 bg-blue-50"           },
-  COMPLETED:  { label: "Completed",  icon: CheckCircle2,   classes: "text-emerald-600 bg-emerald-50"     },
-  FAILED:     { label: "Failed",     icon: XCircle,        classes: "text-rose-500 bg-rose-50"           },
+  PENDING:    { label: "Pending",    icon: Clock,          classes: "text-slate-500 bg-slate-100"    },
+  PROCESSING: { label: "Processing", icon: Clock,          classes: "text-blue-600 bg-blue-50"       },
+  COMPLETED:  { label: "Completed",  icon: CheckCircle2,   classes: "text-emerald-600 bg-emerald-50" },
+  FAILED:     { label: "Failed",     icon: XCircle,        classes: "text-rose-500 bg-rose-50"       },
 };
 
 function StatusBadge({ status }: { status: ImportStatus }) {
@@ -45,18 +128,20 @@ function fmtRelativeDate(iso: string) {
   const d   = new Date(iso);
   const now = new Date();
   const diff = (now.getTime() - d.getTime()) / 1000;
-  if (diff < 60)     return "just now";
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60)    return "just now";
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// ── Job row component ─────────────────────────────────────────────────────────
+// ── Job row ───────────────────────────────────────────────────────────────────
 
 function JobRow({ job }: { job: ImportJob }) {
   const [expanded, setExpanded] = useState(false);
   const hasErrors = (job.error_log?.length ?? 0) > 0;
   const pct = job.rows_total > 0 ? Math.round((job.rows_processed / job.rows_total) * 100) : 0;
+
+  const provider = PROVIDERS.find((p) => p.id === job.source);
 
   return (
     <>
@@ -74,7 +159,9 @@ function JobRow({ job }: { job: ImportJob }) {
           </div>
         </td>
         <td className="px-4 py-3">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{job.source}</span>
+          <span className="text-xs font-semibold text-slate-600">
+            {provider?.name ?? job.source}
+          </span>
         </td>
         <td className="px-4 py-3">
           <StatusBadge status={job.status} />
@@ -184,7 +271,7 @@ export default function Import() {
 
   const [dragging,  setDragging]  = useState(false);
   const [file,      setFile]      = useState<File | null>(null);
-  const [source,    setSource]    = useState<"CSV" | "FINIO" | "TRANSACT">("CSV");
+  const [source,    setSource]    = useState<Source>("TRANSACT");
   const [headers,   setHeaders]   = useState<string[]>([]);
   const [mapping,   setMapping]   = useState<Partial<Record<CanonicalKey, string>>>({});
   const [result,    setResult]    = useState<{ ok: boolean; message: string } | null>(null);
@@ -269,38 +356,83 @@ export default function Import() {
     }
   }
 
+  const activeProvider = PROVIDERS.find((p) => p.id === source)!;
+
   return (
     <PageShell title="Import Data">
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
 
-        {/* Upload panel */}
+        {/* ── Step 1: Provider selection ─────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#002147] text-white text-[10px] font-bold shrink-0">1</span>
+            <h2 className="text-sm font-semibold text-[#0F172A]">Select data source</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {PROVIDERS.map((p) => {
+              const active = source === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSource(p.id)}
+                  className={cn(
+                    "relative text-left bg-white border rounded-xl p-5 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002147]",
+                    active
+                      ? "border-[#002147] ring-1 ring-[#002147]/20 shadow-md"
+                      : "border-[#E2E8F0] hover:border-slate-300 hover:shadow"
+                  )}
+                >
+                  {/* Most-used badge */}
+                  {p.badge && (
+                    <span className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {p.badge}
+                    </span>
+                  )}
+
+                  {/* Selected indicator */}
+                  {active && (
+                    <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#002147] flex items-center justify-center">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                    </span>
+                  )}
+
+                  {/* Logo */}
+                  <div className="mb-4">{p.logo}</div>
+
+                  {/* Name + tagline */}
+                  <p className="text-sm font-semibold text-[#0F172A] leading-tight">{p.name}</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">{p.tagline}</p>
+
+                  {/* Description */}
+                  <p className="text-xs text-slate-400 leading-relaxed">{p.description}</p>
+
+                  {/* Active bottom bar */}
+                  {active && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl bg-[#002147]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Step 2: Upload ─────────────────────────────────────────────────── */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-[#E2E8F0]">
-            <h2 className="text-sm font-semibold text-[#0F172A]">Upload CSV</h2>
+          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#002147] text-white text-[10px] font-bold shrink-0">2</span>
+              <h2 className="text-sm font-semibold text-[#0F172A]">Upload file</h2>
+            </div>
+            {/* Active provider pill */}
+            <div className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-1.5">
+              <span className="text-xs text-slate-500">Importing from</span>
+              <span className="text-xs font-semibold text-[#002147]">{activeProvider.name}</span>
+              <ArrowRight className="w-3 h-3 text-slate-400" />
+            </div>
           </div>
 
           <div className="p-5 space-y-5">
-            {/* Source selector */}
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500 w-20">Source</span>
-              <div className="flex gap-2">
-                {(["CSV", "FINIO", "TRANSACT"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSource(s)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-                      source === s
-                        ? "bg-[#E8F0FE] border-[#002147]/20 text-[#002147]"
-                        : "border-[#E2E8F0] text-slate-500 hover:text-[#0F172A] hover:border-slate-300"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Drop zone */}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -324,9 +456,15 @@ export default function Import() {
                 </>
               ) : (
                 <>
-                  <Upload className="w-8 h-8 text-slate-400" />
-                  <p className="text-sm font-medium text-[#0F172A]">Drop a CSV file here, or click to browse</p>
-                  <p className="text-xs text-slate-500">Supports standard transaction exports from Transact, Finio, or generic CSV</p>
+                  <div className="w-12 h-12 rounded-xl bg-[#F1F5F9] flex items-center justify-center">
+                    <Upload className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[#0F172A]">
+                      Drop a {activeProvider.name} CSV here
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">or click to browse your files</p>
+                  </div>
                 </>
               )}
             </div>
@@ -342,7 +480,11 @@ export default function Import() {
             {headers.length > 0 && (
               <div className="border border-[#E2E8F0] rounded-xl p-4 bg-[#F8FAFC]">
                 <h3 className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide mb-4">Column Mapping</h3>
-                <ColumnMapper headers={headers} mapping={mapping} onChange={(k, v) => setMapping((m) => ({ ...m, [k]: v || undefined }))} />
+                <ColumnMapper
+                  headers={headers}
+                  mapping={mapping}
+                  onChange={(k, v) => setMapping((m) => ({ ...m, [k]: v || undefined }))}
+                />
               </div>
             )}
 
@@ -364,15 +506,15 @@ export default function Import() {
               <Button
                 onClick={handleUpload}
                 disabled={!file || isPending}
-                className="min-w-36"
+                className="min-w-40"
               >
-                {isPending ? "Processing…" : file ? `Import ${source}` : "Select a File"}
+                {isPending ? "Processing…" : file ? `Import from ${activeProvider.name}` : "Select a File First"}
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Job history */}
+        {/* ── Import history ─────────────────────────────────────────────────── */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
           <div className="px-5 py-4 border-b border-[#E2E8F0]">
             <h2 className="text-sm font-semibold text-[#0F172A]">Import History</h2>
@@ -401,31 +543,33 @@ export default function Import() {
           )}
         </div>
 
-        {/* Format guide */}
-        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5">
-          <h3 className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide mb-3">Supported CSV Formats</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* ── Format guide ───────────────────────────────────────────────────── */}
+        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-[#E2E8F0]">
+            <h2 className="text-sm font-semibold text-[#0F172A]">Supported Export Formats</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Expected column names for auto-detection</p>
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
               {
-                name:    "Generic / Custom",
-                desc:    "Any CSV with a header row. Use the column mapping tool above to match your columns.",
-                fields:  "date, type, isin, units, price, currency, fees",
+                provider: PROVIDERS[0], // Transact
+                fields:   "Trade Date · Transaction Type · ISIN · Quantity · Price · Currency · Charges",
               },
               {
-                name:    "Transact Export",
-                desc:    "Standard transaction export from Transact platform. Dates in DD/MM/YYYY format are supported.",
-                fields:  "Trade Date, Transaction Type, ISIN, Quantity, Price, Currency, Charges",
+                provider: PROVIDERS[1], // Finio
+                fields:   "tradeDate · txType · isin · units · unitPrice · currency · fees",
               },
               {
-                name:    "Finio Export",
-                desc:    "Valuation and transaction exports from Finio. Auto-detected when source is set to FINIO.",
-                fields:  "tradeDate, txType, isin, units, unitPrice, currency, fees",
+                provider: PROVIDERS[2], // CSV
+                fields:   "date · type · isin · units · price · currency · fees · reference",
               },
-            ].map(({ name, desc, fields }) => (
-              <div key={name} className="text-xs">
-                <p className="font-semibold text-[#0F172A] mb-1">{name}</p>
-                <p className="text-slate-500 mb-2">{desc}</p>
-                <code className="text-slate-400 font-mono text-[10px] break-all">{fields}</code>
+            ].map(({ provider, fields }) => (
+              <div key={provider.id} className="flex gap-3">
+                <div className="shrink-0 scale-75 origin-top-left">{provider.logo}</div>
+                <div className="pt-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#0F172A] mb-0.5">{provider.name}</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed font-mono break-words">{fields}</p>
+                </div>
               </div>
             ))}
           </div>
