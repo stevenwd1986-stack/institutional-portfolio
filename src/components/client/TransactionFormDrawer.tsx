@@ -7,6 +7,7 @@ import {
   useDeleteTransaction,
 } from "../../hooks/useTransactions";
 import type { TransactionRow, TransactionInput, TxType } from "../../hooks/useTransactions";
+import { useWrappers } from "../../hooks/useWrappers";
 
 // ── Transaction type config ───────────────────────────────────────────────────
 
@@ -55,8 +56,9 @@ const GROUPS = ["Cash", "Income", "Tax", "Transfer"] as const;
 
 // ── Blank form ────────────────────────────────────────────────────────────────
 
-function blankForm(type: TxType = "CASH_IN"): TransactionInput {
+function blankForm(type: TxType = "CASH_IN", wrapperId = ""): TransactionInput {
   return {
+    wrapper_id:       wrapperId,
     transaction_type: type,
     trade_date:       new Date().toISOString().slice(0, 10),
     asset_name:       "",
@@ -71,6 +73,7 @@ function blankForm(type: TxType = "CASH_IN"): TransactionInput {
 
 function rowToForm(row: TransactionRow): TransactionInput {
   return {
+    wrapper_id:       row.wrapper_id,
     transaction_type: row.transaction_type,
     trade_date:       row.trade_date,
     asset_name:       row.asset_name,
@@ -101,16 +104,24 @@ const inputCls = "w-full bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] tex
 // ── Main drawer ───────────────────────────────────────────────────────────────
 
 interface Props {
-  clientId:  string;
-  editRow:   TransactionRow | null;   // null = add mode
-  onClose:   () => void;
+  clientId:         string;
+  editRow:          TransactionRow | null;   // null = add mode
+  defaultWrapperId?: string;
+  onClose:          () => void;
 }
 
-export function TransactionFormDrawer({ clientId, editRow, onClose }: Props) {
+const WRAPPER_TYPE_LABEL: Record<string, string> = {
+  SIPP: "SIPP", ISA: "ISA", GIA: "GIA",
+  OFFSHORE_BOND: "Offshore Bond", LISA: "LISA", JISA: "JISA",
+};
+
+export function TransactionFormDrawer({ clientId, editRow, defaultWrapperId, onClose }: Props) {
   const isEdit = editRow !== null;
+  const { data: wrappers = [] } = useWrappers(clientId);
+  const activeWrappers = wrappers.filter((w) => !w.is_closed);
 
   const [form,         setForm]         = useState<TransactionInput>(() =>
-    isEdit ? rowToForm(editRow) : blankForm()
+    isEdit ? rowToForm(editRow) : blankForm("CASH_IN", defaultWrapperId ?? activeWrappers[0]?.id ?? "")
   );
   const [confirmDel,   setConfirmDel]   = useState(false);
   const [errors,       setErrors]       = useState<Partial<Record<keyof TransactionInput, string>>>({});
@@ -140,6 +151,7 @@ export function TransactionFormDrawer({ clientId, editRow, onClose }: Props) {
 
   function validate(): boolean {
     const errs: typeof errors = {};
+    if (!form.wrapper_id)   errs.wrapper_id   = "Required";
     if (!form.trade_date)   errs.trade_date   = "Required";
     if (!form.net_amount || isNaN(parseFloat(form.net_amount))) errs.net_amount = "Enter a valid amount";
 
@@ -208,6 +220,24 @@ export function TransactionFormDrawer({ clientId, editRow, onClose }: Props) {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+
+          {/* ── Account selector ─────────────────────────────────────────────── */}
+          <Field label="Account" required>
+            <select
+              value={form.wrapper_id}
+              onChange={(e) => set("wrapper_id", e.target.value)}
+              className={cn(inputCls, !form.wrapper_id && "border-rose-300")}
+            >
+              <option value="">— select account —</option>
+              {activeWrappers.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {WRAPPER_TYPE_LABEL[w.wrapper_type] ?? w.wrapper_type} — {w.platform}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="h-px bg-[#E2E8F0]" />
 
           {/* ── Transaction type picker ──────────────────────────────────────── */}
           <div>

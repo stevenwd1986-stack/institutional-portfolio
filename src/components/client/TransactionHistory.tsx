@@ -1,6 +1,7 @@
 import { useState }                    from "react";
 import { useTransactions }             from "../../hooks/useTransactions";
 import type { TransactionRow, TxType } from "../../hooks/useTransactions";
+import { useWrappers }                 from "../../hooks/useWrappers";
 import { TransactionFormDrawer }       from "./TransactionFormDrawer";
 import { cn, fmt }                     from "../../lib/utils";
 import { ChevronLeft, ChevronRight, Plus, Pencil } from "lucide-react";
@@ -51,45 +52,108 @@ const TX_COLOR: Partial<Record<TxType, string>> = {
   TAX:                     "text-amber-600",
 };
 
-const PAGE_SIZE = 10;
+const WRAPPER_TYPE_LABEL: Record<string, string> = {
+  SIPP: "SIPP", ISA: "ISA", GIA: "GIA",
+  OFFSHORE_BOND: "Offshore Bond", LISA: "LISA", JISA: "JISA",
+};
+
+// Accent dot colour per wrapper type
+const WRAPPER_DOT: Record<string, string> = {
+  SIPP:          "bg-[#002147]",
+  ISA:           "bg-emerald-500",
+  GIA:           "bg-slate-400",
+  OFFSHORE_BOND: "bg-violet-500",
+  LISA:          "bg-pink-500",
+  JISA:          "bg-blue-500",
+};
+
+const PAGE_SIZE = 15;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TransactionHistory({ clientId }: { clientId: string }) {
-  const [page,    setPage]    = useState(0);
-  const [drawerRow, setDrawerRow] = useState<TransactionRow | null | "new">(undefined as unknown as null);
-  const { data } = useTransactions(clientId, page, PAGE_SIZE);
+  const [page,           setPage]         = useState(0);
+  const [activeWrapper,  setActiveWrapper] = useState<string | undefined>(undefined);
+  const [drawerRow,      setDrawerRow]     = useState<TransactionRow | "new" | null>(null);
+
+  const { data: wrappers = [] } = useWrappers(clientId);
+  const activeWrappers = wrappers.filter((w) => !w.is_closed);
+
+  const { data } = useTransactions(clientId, page, PAGE_SIZE, activeWrapper);
 
   const transactions = data?.transactions ?? [];
   const total        = data?.total        ?? 0;
   const totalPages   = Math.ceil(total / PAGE_SIZE);
 
-  const drawerOpen = drawerRow !== undefined && drawerRow !== (undefined as unknown as null);
+  function switchWrapper(id: string | undefined) {
+    setActiveWrapper(id);
+    setPage(0);
+  }
 
-  function openAdd() { setDrawerRow("new"); }
+  function openAdd()               { setDrawerRow("new"); }
   function openEdit(row: TransactionRow) { setDrawerRow(row); }
-  function closeDrawer() { setDrawerRow(undefined as unknown as null); }
+  function closeDrawer()           { setDrawerRow(null); }
 
   return (
     <>
       <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
 
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+        {/* ── Header ─────────────────────────────────────────────────────────── */}
+        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-sm font-semibold text-[#0F172A]">Transaction History</h2>
-            <p className="text-xs text-slate-500 mt-0.5">{total} transactions</p>
+            <p className="text-xs text-slate-500 mt-0.5">{total} transaction{total !== 1 ? "s" : ""}{activeWrapper ? " in this account" : " across all accounts"}</p>
           </div>
           <button
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#002147] hover:bg-[#001530] rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#002147] hover:bg-[#001530] rounded-lg transition-colors shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             Add transaction
           </button>
         </div>
 
-        {/* Table */}
+        {/* ── Account filter tabs ─────────────────────────────────────────────── */}
+        <div className="px-5 py-2.5 border-b border-[#E2E8F0] overflow-x-auto">
+          <div className="flex items-center gap-1.5 min-w-max">
+            {/* All accounts tab */}
+            <button
+              onClick={() => switchWrapper(undefined)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
+                activeWrapper === undefined
+                  ? "bg-[#002147] text-white"
+                  : "text-slate-500 hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+              )}
+            >
+              All accounts
+            </button>
+
+            {/* Per-wrapper tabs */}
+            {activeWrappers.map((w) => {
+              const isActive = activeWrapper === w.id;
+              const dot      = WRAPPER_DOT[w.wrapper_type] ?? "bg-slate-400";
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => switchWrapper(w.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
+                    isActive
+                      ? "bg-[#F1F5F9] text-[#0F172A] ring-1 ring-[#E2E8F0]"
+                      : "text-slate-500 hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                  )}
+                >
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
+                  {WRAPPER_TYPE_LABEL[w.wrapper_type] ?? w.wrapper_type}
+                  <span className="text-slate-400 font-normal">· {w.platform}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Table ──────────────────────────────────────────────────────────── */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -99,7 +163,7 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
                     key={h}
                     className={cn(
                       "px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap",
-                      h === "Date" || h === "Type" || h === "Asset / Description" || h === "" ? "text-left" : "text-right"
+                      ["Date", "Type", "Asset / Description", ""].includes(h) ? "text-left" : "text-right"
                     )}
                   >
                     {h}
@@ -129,6 +193,16 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
                     <p className="text-xs text-[#0F172A] truncate">{tx.asset_name}</p>
                     {tx.isin && <p className="text-[10px] text-slate-400 font-mono mt-0.5">{tx.isin}</p>}
                     {tx.notes && <p className="text-[10px] text-slate-400 mt-0.5 truncate italic">{tx.notes}</p>}
+                    {/* Show account badge when viewing "All accounts" */}
+                    {activeWrapper === undefined && (() => {
+                      const w = activeWrappers.find((w) => w.id === tx.wrapper_id);
+                      return w ? (
+                        <span className="inline-flex items-center gap-1 mt-1">
+                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", WRAPPER_DOT[w.wrapper_type] ?? "bg-slate-400")} />
+                          <span className="text-[10px] text-slate-400">{WRAPPER_TYPE_LABEL[w.wrapper_type]} · {w.platform}</span>
+                        </span>
+                      ) : null;
+                    })()}
                   </td>
 
                   <td className="px-4 py-3.5 text-right text-xs text-slate-500 tabular-nums whitespace-nowrap">
@@ -152,7 +226,6 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
                     {tx.fees > 0 ? fmt(tx.fees) : <span className="text-slate-300">—</span>}
                   </td>
 
-                  {/* Tags + edit button */}
                   <td className="px-3 py-3.5 text-left">
                     <div className="flex items-center gap-2">
                       {tx.is_book_over && (
@@ -175,7 +248,7 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
               {transactions.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
-                    No transactions yet.{" "}
+                    No transactions{activeWrapper ? " for this account" : ""} yet.{" "}
                     <button onClick={openAdd} className="text-[#002147] hover:underline font-medium">
                       Add the first one
                     </button>
@@ -186,7 +259,7 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* ── Pagination ─────────────────────────────────────────────────────── */}
         {totalPages > 1 && (
           <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[#E2E8F0]">
             <button
@@ -210,11 +283,12 @@ export function TransactionHistory({ clientId }: { clientId: string }) {
         )}
       </div>
 
-      {/* Drawer */}
-      {drawerOpen && (
+      {/* ── Drawer ─────────────────────────────────────────────────────────────── */}
+      {drawerRow !== null && (
         <TransactionFormDrawer
           clientId={clientId}
-          editRow={drawerRow === "new" ? null : drawerRow as TransactionRow}
+          editRow={drawerRow === "new" ? null : drawerRow}
+          defaultWrapperId={activeWrapper}
           onClose={closeDrawer}
         />
       )}
