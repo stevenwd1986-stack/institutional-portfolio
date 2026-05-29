@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 export interface HoldingDetail {
   id:              string;
@@ -20,7 +21,7 @@ export interface GIATaxDetails {
   taxable_gains:     number;
   tax_basic:         number;
   tax_higher:        number;
-  position_gains: { name: string; gain: number; cost: number }[];
+  position_gains:    { name: string; gain: number; cost: number }[];
 }
 
 export interface OffshoresBondTaxDetails {
@@ -62,148 +63,180 @@ export type TaxDetails =
   | ISATaxDetails;
 
 export interface WrapperDetail {
-  id:           string;
-  client_id:    string;
-  wrapper_type: "SIPP" | "ISA" | "GIA" | "OFFSHORE_BOND";
-  platform:     string;
-  value:        number;
-  cost_basis:   number;
+  id:             string;
+  client_id:      string;
+  wrapper_type:   "SIPP" | "ISA" | "GIA" | "OFFSHORE_BOND";
+  platform:       string;
+  value:          number;
+  cost_basis:     number;
   performance_1y: number;
-  twr:          number;
-  xirr:         number;
-  cagr:         number;
-  holdings:     HoldingDetail[];
-  tax:          TaxDetails;
+  twr:            number;
+  xirr:           number;
+  cagr:           number;
+  holdings:       HoldingDetail[];
+  tax:            TaxDetails;
 }
 
-const DEMO_WRAPPERS: Record<string, WrapperDetail> = {
-  // ── James Thornton — SIPP (w1) ────────────────────────────────────────────
-  w1: {
-    id: "w1", client_id: "c1", wrapper_type: "SIPP", platform: "Transact",
-    value: 1_420_000, cost_basis: 980_000, performance_1y: 0.134, twr: 0.128, xirr: 0.119, cagr: 0.113,
-    holdings: [
-      { id: "h1-1", asset_name: "Vanguard LifeStrategy 80% Equity",    isin: "GB00B4PQW151", asset_class: "MIXED",        units: 35_420, price: 24.80,  market_value: 878_416, cost_basis: 620_000, unrealised_gain: 258_416, pct_gain: 0.417 },
-      { id: "h1-2", asset_name: "Baillie Gifford Managed Fund",         isin: "GB0006059330", asset_class: "MIXED",        units:  8_240, price: 63.50,  market_value: 523_240, cost_basis: 355_000, unrealised_gain: 168_240, pct_gain: 0.474 },
-      { id: "h1-3", asset_name: "Cash (GBP)",                           isin: null,           asset_class: "CASH",         units:  18_344, price: 1.00, market_value:  18_344, cost_basis:  18_344, unrealised_gain:       0, pct_gain: 0.000 },
-    ],
-    tax: {
-      type: "SIPP",
-      uncrystallised:      1_240_000,
-      drawdown:              180_000,
-      annual_allowance:       60_000,
-      allowance_used:         35_000,
-      allowance_remaining:    25_000,
-      pcls_available:        268_275,  // capped at standard PCLS limit
-      pcls_max:              268_275,
-    },
-  },
-
-  // ── James Thornton — ISA (w2) ─────────────────────────────────────────────
-  w2: {
-    id: "w2", client_id: "c1", wrapper_type: "ISA", platform: "Transact",
-    value: 400_000, cost_basis: 360_000, performance_1y: 0.083, twr: 0.079, xirr: 0.075, cagr: 0.071,
-    holdings: [
-      { id: "h2-1", asset_name: "Vanguard LifeStrategy 60% Equity", isin: "GB00B3TYHH97", asset_class: "MIXED",        units: 8_642, price: 27.30, market_value: 235_927, cost_basis: 210_000, unrealised_gain: 25_927, pct_gain: 0.124 },
-      { id: "h2-2", asset_name: "iShares UK Gilts All Stocks",      isin: "IE00B7LFXY77", asset_class: "FIXED_INCOME", units: 5_430, price: 16.50, market_value:  89_595, cost_basis:  97_000, unrealised_gain: -7_405, pct_gain: -0.076 },
-      { id: "h2-3", asset_name: "Fidelity Index World Fund",        isin: "GB00BJS8SF95", asset_class: "EQUITY",       units: 4_120, price: 18.05, market_value:  74_366, cost_basis:  53_000, unrealised_gain: 21_366, pct_gain: 0.403 },
-    ],
-    tax: {
-      type: "ISA",
-      total_subscribed:          360_000,
-      tax_free_growth:            40_000,
-      current_year_subscription:  14_500,
-      subscription_limit:         20_000,
-      subscription_remaining:      5_500,
-    },
-  },
-
-  // ── James Thornton — GIA (w3) ─────────────────────────────────────────────
-  w3: {
-    id: "w3", client_id: "c1", wrapper_type: "GIA", platform: "Finio",
-    value: 850_000, cost_basis: 720_000, performance_1y: 0.099, twr: 0.094, xirr: 0.088, cagr: 0.082,
-    holdings: [
-      { id: "h3-1", asset_name: "Vanguard FTSE All-World ETF",      isin: "IE00B3RBWM25", asset_class: "EQUITY",  units: 2_847, price:  85.40, market_value: 243_074, cost_basis: 195_000, unrealised_gain: 48_074, pct_gain: 0.247 },
-      { id: "h3-2", asset_name: "iShares Core MSCI Emerging Markets",isin: "IE00BKM4GZ66", asset_class: "EQUITY",  units: 4_125, price:  53.20, market_value: 219_450, cost_basis: 197_250, unrealised_gain: 22_200, pct_gain: 0.113 },
-      { id: "h3-3", asset_name: "SPDR S&P 500 ETF Trust",           isin: "IE00B6YX5C33", asset_class: "EQUITY",  units: 1_280, price: 196.80, market_value: 251_904, cost_basis: 205_000, unrealised_gain: 46_904, pct_gain: 0.229 },
-      { id: "h3-4", asset_name: "Fidelity Index UK Fund",           isin: "GB00BJS8SH10", asset_class: "EQUITY",  units: 8_960, price:  15.07, market_value: 135_027, cost_basis: 122_750, unrealised_gain: 12_277, pct_gain: 0.100 },
-    ],
-    tax: {
-      type: "GIA",
-      unrealised_gains:   129_455,
-      cgt_annual_exempt:    3_000,
-      taxable_gains:      126_455,
-      tax_basic:           25_291,   // 20%
-      tax_higher:          30_349,   // 24%
-      position_gains: [
-        { name: "Vanguard FTSE All-World",         gain: 48_074, cost: 195_000 },
-        { name: "SPDR S&P 500 ETF",                gain: 46_904, cost: 205_000 },
-        { name: "iShares Core MSCI Emerging",      gain: 22_200, cost: 197_250 },
-        { name: "Fidelity Index UK",               gain: 12_277, cost: 122_750 },
-      ],
-    },
-  },
-
-  // ── James Thornton — Offshore Bond (w4) ──────────────────────────────────
-  w4: {
-    id: "w4", client_id: "c1", wrapper_type: "OFFSHORE_BOND", platform: "RL360",
-    value: 177_300, cost_basis: 145_000, performance_1y: 0.071, twr: 0.068, xirr: 0.064, cagr: 0.059,
-    holdings: [
-      { id: "h4-1", asset_name: "RL360 Managed Portfolio (Growth)",   isin: null, asset_class: "MIXED", units: 12_450, price: 9.87,  market_value: 122_882, cost_basis: 100_500, unrealised_gain: 22_382, pct_gain: 0.223 },
-      { id: "h4-2", asset_name: "RL360 Managed Portfolio (Balanced)", isin: null, asset_class: "MIXED", units:  6_890, price: 7.905, market_value:  54_476, cost_basis:  44_500, unrealised_gain:  9_976, pct_gain: 0.224 },
-    ],
-    tax: {
-      type:                  "OFFSHORE_BOND",
-      total_premiums:        145_000,
-      chargeable_event_gain:  32_300,
-      annual_allowance_5pct:   7_250,  // 5% of £145,000
-      years_held:                  8,
-      cumulative_allowance:   58_000,  // 8 × £7,250
-      allowance_used:              0,  // no withdrawals made
-      allowance_remaining:    58_000,
-      top_sliced_gain:         4_038,  // £32,300 / 8
-    },
-  },
-
-  // ── Robert Ashworth — SIPP (w5) ───────────────────────────────────────────
-  w5: {
-    id: "w5", client_id: "c3", wrapper_type: "SIPP", platform: "Quilter",
-    value: 2_100_000, cost_basis: 1_600_000, performance_1y: 0.158, twr: 0.149, xirr: 0.141, cagr: 0.133,
-    holdings: [
-      { id: "h5-1", asset_name: "Baillie Gifford Global Alpha",     isin: "GB0006054231", asset_class: "EQUITY",  units: 42_800, price: 28.60, market_value: 1_224_080, cost_basis: 900_000, unrealised_gain: 324_080, pct_gain: 0.360 },
-      { id: "h5-2", asset_name: "Fundsmith Equity Fund",            isin: "GB00B4Q5X527", asset_class: "EQUITY",  units:  9_840, price: 59.50, market_value:   585_480, cost_basis: 480_000, unrealised_gain: 105_480, pct_gain: 0.220 },
-      { id: "h5-3", asset_name: "Cash (GBP)",                       isin: null,           asset_class: "CASH",    units: 290_440, price: 1.00, market_value:   290_440, cost_basis: 220_000, unrealised_gain:  70_440, pct_gain: 0.320 },
-    ],
-    tax: {
-      type: "SIPP",
-      uncrystallised:    1_850_000,
-      drawdown:            250_000,
-      annual_allowance:     60_000,
-      allowance_used:       60_000,  // fully used
-      allowance_remaining:       0,
-      pcls_available:      268_275,
-      pcls_max:            268_275,
-    },
-  },
+const WRAPPER_TYPE_MAP: Record<string, WrapperDetail["wrapper_type"]> = {
+  isa_ss: "ISA", isa_cash: "ISA",
+  sipp: "SIPP", sipp_drawdown: "SIPP", dc_workplace: "SIPP", db_workplace: "SIPP",
+  gia: "GIA",
+  investment_bond: "OFFSHORE_BOND",
 };
 
-function fallbackWrapper(clientId: string, wrapperId: string): WrapperDetail {
+const PCLS_MAX = 268_275;
+const CGT_EXEMPT = 3_000;
+
+async function buildTax(
+  wrapperType: WrapperDetail["wrapper_type"],
+  clientId:    string,
+  accountId:   string,
+  value:       number,
+  costBasis:   number,
+  holdings:    HoldingDetail[],
+): Promise<TaxDetails> {
+  if (wrapperType === "GIA") {
+    const unrealised = holdings.reduce((s, h) => s + Math.max(0, h.unrealised_gain), 0);
+    const taxable    = Math.max(0, unrealised - CGT_EXEMPT);
+    return {
+      type:              "GIA",
+      unrealised_gains:  unrealised,
+      cgt_annual_exempt: CGT_EXEMPT,
+      taxable_gains:     taxable,
+      tax_basic:         taxable * 0.20,
+      tax_higher:        taxable * 0.24,
+      position_gains:    holdings
+        .filter((h) => h.unrealised_gain > 0)
+        .map((h) => ({ name: h.asset_name, gain: h.unrealised_gain, cost: h.cost_basis })),
+    };
+  }
+
+  if (wrapperType === "ISA") {
+    const currentTaxYear = (() => {
+      const now = new Date();
+      const y   = now.getFullYear();
+      return now.getMonth() < 3 ? `${y - 1}/${y}` : `${y}/${y + 1}`;
+    })();
+
+    const { data: sub } = await supabase
+      .from("isa_subscriptions")
+      .select("amount_subscribed, annual_allowance")
+      .eq("account_id", accountId)
+      .eq("tax_year", currentTaxYear)
+      .maybeSingle();
+
+    const subscribed  = sub?.amount_subscribed ?? 0;
+    const limit       = sub?.annual_allowance  ?? 20_000;
+    return {
+      type:                      "ISA",
+      total_subscribed:          costBasis,
+      tax_free_growth:           value - costBasis,
+      current_year_subscription: subscribed,
+      subscription_limit:        limit,
+      subscription_remaining:    Math.max(0, limit - subscribed),
+    };
+  }
+
+  if (wrapperType === "SIPP") {
+    const currentTaxYear = (() => {
+      const now = new Date();
+      const y   = now.getFullYear();
+      return now.getMonth() < 3 ? `${y - 1}/${y}` : `${y}/${y + 1}`;
+    })();
+
+    const { data: pens } = await supabase
+      .from("pension_allowance_usage")
+      .select("annual_allowance, amount_used")
+      .eq("client_id", clientId)
+      .eq("tax_year", currentTaxYear)
+      .maybeSingle();
+
+    const allowance = pens?.annual_allowance ?? 60_000;
+    const used      = pens?.amount_used      ?? 0;
+    return {
+      type:                "SIPP",
+      uncrystallised:      value,
+      drawdown:            0,
+      annual_allowance:    allowance,
+      allowance_used:      used,
+      allowance_remaining: Math.max(0, allowance - used),
+      pcls_available:      Math.min(value * 0.25, PCLS_MAX),
+      pcls_max:            PCLS_MAX,
+    };
+  }
+
+  // OFFSHORE_BOND
   return {
-    id: wrapperId, client_id: clientId, wrapper_type: "SIPP", platform: "Transact",
-    value: 500_000, cost_basis: 400_000, performance_1y: 0.09, twr: 0.086, xirr: 0.081, cagr: 0.077,
-    holdings: [],
-    tax: {
-      type: "SIPP",
-      uncrystallised: 500_000, drawdown: 0,
-      annual_allowance: 60_000, allowance_used: 20_000, allowance_remaining: 40_000,
-      pcls_available: 125_000, pcls_max: 268_275,
-    },
+    type:                  "OFFSHORE_BOND",
+    total_premiums:        costBasis,
+    chargeable_event_gain: Math.max(0, value - costBasis),
+    annual_allowance_5pct: costBasis * 0.05,
+    years_held:            0,
+    cumulative_allowance:  0,
+    allowance_used:        0,
+    allowance_remaining:   0,
+    top_sliced_gain:       0,
   };
 }
 
 export function useWrapper(clientId: string, wrapperId: string) {
   return useQuery<WrapperDetail>({
     queryKey: ["wrapper", clientId, wrapperId],
-    queryFn:  async () => DEMO_WRAPPERS[wrapperId] ?? fallbackWrapper(clientId, wrapperId),
+    queryFn: async () => {
+      if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+
+      const { data, error } = await supabase
+        .from("accounts")
+        .select(`
+          id, account_type, provider, current_value, is_active, client_id,
+          holdings(
+            id, units, cost_basis, current_price, current_value,
+            instruments(isin, name, asset_class)
+          )
+        `)
+        .eq("id", wrapperId)
+        .single();
+
+      if (error) throw error;
+
+      const wrapperType = WRAPPER_TYPE_MAP[data.account_type] ?? "GIA";
+
+      const holdings: HoldingDetail[] = (data.holdings as any[]).map((h) => {
+        const gain = (h.current_value ?? 0) - (h.cost_basis ?? 0);
+        return {
+          id:              h.id,
+          asset_name:      h.instruments?.name ?? "Unknown",
+          isin:            h.instruments?.isin ?? null,
+          asset_class:     h.instruments?.asset_class ?? "EQUITY",
+          units:           h.units ?? 0,
+          price:           h.current_price ?? 0,
+          market_value:    h.current_value ?? 0,
+          cost_basis:      h.cost_basis ?? 0,
+          unrealised_gain: gain,
+          pct_gain:        (h.cost_basis ?? 0) > 0 ? gain / h.cost_basis : 0,
+        };
+      });
+
+      const value     = data.current_value ?? 0;
+      const costBasis = holdings.reduce((s, h) => s + h.cost_basis, 0);
+
+      const tax = await buildTax(wrapperType, clientId, wrapperId, value, costBasis, holdings);
+
+      return {
+        id:             data.id,
+        client_id:      clientId,
+        wrapper_type:   wrapperType,
+        platform:       data.provider ?? "Unknown",
+        value,
+        cost_basis:     costBasis,
+        performance_1y: 0,
+        twr:            0,
+        xirr:           0,
+        cagr:           0,
+        holdings,
+        tax,
+      };
+    },
     staleTime: 1000 * 60 * 5,
   });
 }

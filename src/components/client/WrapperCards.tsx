@@ -1,35 +1,93 @@
-import { useNavigate }  from "react-router-dom";
-import { useWrappers }  from "../../hooks/useWrappers";
-import { fmt, fmtPct }  from "../../lib/utils";
-import { cn }           from "../../lib/utils";
+import { useNavigate }    from "react-router-dom";
+import { useQuery }       from "@tanstack/react-query";
+import { useWrappers }    from "../../hooks/useWrappers";
+import { fmt, fmtPct }   from "../../lib/utils";
+import { cn }            from "../../lib/utils";
 import { ChevronRight, Archive, Layers, FileText, Wallet } from "lucide-react";
 import type { WrapperSummary } from "../../hooks/useWrappers";
 
-// ── Platform logo marks ───────────────────────────────────────────────────────
+// ── Brandfetch platform logos ─────────────────────────────────────────────────
 
-function TransactLogo({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className="shrink-0">
-      <rect width="48" height="48" rx="10" fill="#00843D" />
-      <path d="M12 16 H36 M24 16 V34" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M19 28 L24 34 L29 28" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
+const BRANDFETCH_KEY = import.meta.env.VITE_BRANDFETCH_API_KEY as string | undefined;
+
+const PLATFORM_DOMAINS: Record<string, string> = {
+  TRANSACT:        "transact.co.uk",
+  FINIO:           "finio.co.uk",
+  NOVIA:           "novia.co.uk",
+  QUILTER:         "quilter.com",
+  RL360:           "rl360.com",
+  "CANADA LIFE":   "canadalife.co.uk",
+  "STANDARD LIFE": "standardlife.co.uk",
+  AVIVA:           "aviva.co.uk",
+  ABRDN:           "abrdn.com",
+  NUCLEUS:         "nucleusfinancial.com",
+  AEGON:           "aegon.co.uk",
+  ZURICH:          "zurich.co.uk",
+  "OLD MUTUAL":    "oldmutualwealth.co.uk",
+};
+
+const logoUrlCache = new Map<string, string | null>();
+
+async function fetchBrandfetchLogo(domain: string): Promise<string | null> {
+  if (logoUrlCache.has(domain)) return logoUrlCache.get(domain)!;
+  if (!BRANDFETCH_KEY) return null;
+
+  try {
+    const res = await fetch(`https://api.brandfetch.io/v2/brands/${domain}`, {
+      headers: { Authorization: `Bearer ${BRANDFETCH_KEY}` },
+    });
+    if (!res.ok) { logoUrlCache.set(domain, null); return null; }
+
+    const json = await res.json();
+    const logos: any[] = json.logos ?? [];
+
+    // Prefer icon, fall back to first logo available
+    const target = logos.find((l) => l.type === "icon") ?? logos[0];
+    if (!target) { logoUrlCache.set(domain, null); return null; }
+
+    const formats: any[] = target.formats ?? [];
+    const src =
+      (formats.find((f) => f.format === "svg") ??
+       formats.find((f) => f.format === "png") ??
+       formats[0])?.src ?? null;
+
+    logoUrlCache.set(domain, src);
+    return src;
+  } catch {
+    logoUrlCache.set(domain, null);
+    return null;
+  }
 }
 
-function FinioLogo({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className="shrink-0">
-      <rect width="48" height="48" rx="10" fill="#4F46E5" />
-      <path d="M14 12 H34 M14 12 V36 M14 24 H28" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
+function usePlatformLogo(platform: string) {
+  const domain = PLATFORM_DOMAINS[platform.toUpperCase()];
+  return useQuery({
+    queryKey:  ["platform-logo", domain ?? platform],
+    queryFn:   () => (domain ? fetchBrandfetchLogo(domain) : Promise.resolve(null)),
+    staleTime: 1000 * 60 * 60 * 24,
+    enabled:   Boolean(domain),
+  });
 }
 
-function GenericPlatformLogo({ size = 18 }: { size?: number }) {
+function PlatformLogo({ platform, size = 18 }: { platform: string; size?: number }) {
+  const { data: logoUrl } = usePlatformLogo(platform);
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        width={size}
+        height={size}
+        className="rounded-sm shrink-0 object-contain"
+        alt={platform}
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+
   return (
     <span
-      className="shrink-0 rounded-md bg-slate-400 flex items-center justify-center"
+      className="shrink-0 rounded-md bg-slate-300 flex items-center justify-center"
       style={{ width: size, height: size }}
     >
       <FileText className="text-white" style={{ width: size * 0.6, height: size * 0.6 }} />
@@ -37,14 +95,7 @@ function GenericPlatformLogo({ size = 18 }: { size?: number }) {
   );
 }
 
-function PlatformLogo({ platform, size = 18 }: { platform: string; size?: number }) {
-  const p = platform.toUpperCase();
-  if (p.includes("TRANSACT")) return <TransactLogo size={size} />;
-  if (p.includes("FINIO"))    return <FinioLogo    size={size} />;
-  return <GenericPlatformLogo size={size} />;
-}
-
-// ── Style config — light palette ──────────────────────────────────────────────
+// ── Style config ──────────────────────────────────────────────────────────────
 
 const WRAPPER_STYLE: Record<string, { label: string; accent: string; bg: string; bar: string; dot: string }> = {
   SIPP:          { label: "SIPP",          accent: "text-[#002147]",   bg: "bg-white border-[#E2E8F0]", bar: "bg-[#002147]",   dot: "bg-[#002147]"   },
@@ -65,7 +116,6 @@ function SubAccountChips({ wrapper }: { wrapper: WrapperSummary }) {
 
   return (
     <div className="mt-3 space-y-2">
-      {/* GIA sub-plan section — shown when bond contains GIA sub-plans */}
       {hasGIA && (
         <div className="border border-violet-100 rounded-lg bg-violet-50/60 px-2.5 py-2">
           <p className="text-[9px] font-semibold text-violet-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
@@ -83,7 +133,6 @@ function SubAccountChips({ wrapper }: { wrapper: WrapperSummary }) {
         </div>
       )}
 
-      {/* Non-GIA sub-accounts (direct holdings, DFM mandates) */}
       {sub_accounts.filter((sa) => sa.type !== "SUB_GIA").length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {sub_accounts.filter((sa) => sa.type !== "SUB_GIA").map((sa) => (
@@ -147,13 +196,11 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
         style.bg
       )}
     >
-      {/* Header row */}
       <div className="flex items-center justify-between mb-2.5">
         <span className={cn("text-xs font-bold uppercase tracking-wide", style.accent)}>
           {style.label}
         </span>
 
-        {/* Platform badge with logo */}
         <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2 py-1">
           <PlatformLogo platform={w.platform} size={14} />
           <span className="text-[11px] font-medium text-slate-600">{w.platform}</span>
@@ -165,7 +212,6 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
         {fmt(w.value)}
       </p>
 
-      {/* Value bar */}
       <div className="mt-3 h-1 bg-[#E2E8F0] rounded-full overflow-hidden">
         <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${fillPct}%` }} />
       </div>
@@ -190,7 +236,6 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
         </div>
       </div>
 
-      {/* Sub-account chips */}
       <SubAccountChips wrapper={w} />
 
       <p className={cn("mt-2.5 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity", style.accent)}>
@@ -214,7 +259,6 @@ function PlatformGroup({
 
   return (
     <div>
-      {/* Platform group header with logo */}
       <div className="flex items-center gap-2.5 mb-3">
         <PlatformLogo platform={platform} size={20} />
         <span className="text-sm font-semibold text-[#0F172A]">{platform}</span>
@@ -250,7 +294,6 @@ export function WrapperCards({ clientId }: { clientId: string }) {
   const singlePlatform = groups.size === 1;
 
   if (singlePlatform) {
-    // Still show the platform header even when single platform
     const [[platform, ws]] = [...groups.entries()];
     return (
       <div>
