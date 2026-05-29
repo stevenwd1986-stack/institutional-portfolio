@@ -12,16 +12,16 @@ export function StatCard({ label, value, valueClass, subtext, icon }: StatCardPr
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between">
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-        {icon && <span className="text-slate-400">{icon}</span>}
+        <p className="text-sm font-medium text-[#64748B]">{label}</p>
+        {icon && <span className="text-[#94A3B8]">{icon}</span>}
       </div>
       <p className={cn(
-        "mt-2 text-2xl font-semibold font-['Space_Grotesk'] tracking-tight",
+        "mt-2 text-2xl font-semibold tracking-tight",
         valueClass ?? "text-[#0F172A]"
       )}>
         {value}
       </p>
-      {subtext && <p className="mt-1 text-xs text-slate-500">{subtext}</p>}
+      {subtext && <p className="mt-1 text-xs text-[#64748B]">{subtext}</p>}
     </div>
   );
 }

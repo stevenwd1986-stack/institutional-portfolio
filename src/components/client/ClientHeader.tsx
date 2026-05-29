@@ -42,7 +42,7 @@ export function ClientHeader({ client }: ClientHeaderProps) {
           </button>
 
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F172A] font-['Space_Grotesk'] tracking-tight">
+            <h1 className="text-2xl font-semibold text-[#0F172A] tracking-tight">
               {client.firstName} {client.lastName}
             </h1>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -65,7 +65,7 @@ export function ClientHeader({ client }: ClientHeaderProps) {
         <div className="flex items-center gap-4 sm:flex-col sm:items-end shrink-0">
           <div className="text-right">
             <div className="text-xs text-slate-400 mb-0.5">Total AUM</div>
-            <div className="text-2xl font-semibold text-[#0F172A] font-['Space_Grotesk'] tracking-tight">
+            <div className="text-2xl font-semibold text-[#0F172A] tracking-tight">
               {fmt(client.totalAUM)}
             </div>
           </div>
