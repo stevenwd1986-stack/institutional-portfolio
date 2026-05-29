@@ -47,12 +47,12 @@ function PlatformLogo({ platform, size = 18 }: { platform: string; size?: number
 // ── Style config — light palette ──────────────────────────────────────────────
 
 const WRAPPER_STYLE: Record<string, { label: string; accent: string; bg: string; bar: string; dot: string }> = {
-  SIPP:          { label: "SIPP",          accent: "text-[#002147]",    bg: "bg-[#E8F0FE]    border-[#002147]/15",  bar: "bg-[#002147]",   dot: "bg-[#002147]"   },
-  ISA:           { label: "ISA",           accent: "text-emerald-700",  bg: "bg-emerald-50   border-emerald-200",   bar: "bg-emerald-500", dot: "bg-emerald-500" },
-  GIA:           { label: "GIA",           accent: "text-slate-600",    bg: "bg-[#F1F5F9]    border-[#E2E8F0]",     bar: "bg-slate-400",   dot: "bg-slate-400"   },
-  OFFSHORE_BOND: { label: "Offshore Bond", accent: "text-violet-700",   bg: "bg-violet-50    border-violet-200",    bar: "bg-violet-500",  dot: "bg-violet-500"  },
-  LISA:          { label: "LISA",          accent: "text-pink-700",     bg: "bg-pink-50      border-pink-200",      bar: "bg-pink-500",    dot: "bg-pink-500"    },
-  JISA:          { label: "JISA",          accent: "text-blue-700",     bg: "bg-blue-50      border-blue-200",      bar: "bg-blue-500",    dot: "bg-blue-500"    },
+  SIPP:          { label: "SIPP",          accent: "text-[#002147]",   bg: "bg-white border-[#E2E8F0]", bar: "bg-[#002147]",   dot: "bg-[#002147]"   },
+  ISA:           { label: "ISA",           accent: "text-emerald-700", bg: "bg-white border-[#E2E8F0]", bar: "bg-emerald-500", dot: "bg-emerald-500" },
+  GIA:           { label: "GIA",           accent: "text-slate-600",   bg: "bg-white border-[#E2E8F0]", bar: "bg-slate-400",   dot: "bg-slate-400"   },
+  OFFSHORE_BOND: { label: "Offshore Bond", accent: "text-violet-700",  bg: "bg-white border-[#E2E8F0]", bar: "bg-violet-500",  dot: "bg-violet-500"  },
+  LISA:          { label: "LISA",          accent: "text-pink-700",    bg: "bg-white border-[#E2E8F0]", bar: "bg-pink-500",    dot: "bg-pink-500"    },
+  JISA:          { label: "JISA",          accent: "text-blue-700",    bg: "bg-white border-[#E2E8F0]", bar: "bg-blue-500",    dot: "bg-blue-500"    },
 };
 
 // ── Sub-account chips ─────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
 
   if (w.is_closed) {
     return (
-      <div className="border rounded-xl p-4 opacity-50 bg-[#F8FAFC] border-[#E2E8F0]">
+      <div className="border border-[#E2E8F0] rounded-xl p-4 opacity-50 bg-white">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
             <Archive className="w-3 h-3" />
@@ -129,7 +129,7 @@ function WrapperCard({ w, clientId }: { w: WrapperSummary; clientId: string }) {
         </span>
 
         {/* Platform badge with logo */}
-        <div className="flex items-center gap-1.5 bg-white/70 border border-[#E2E8F0] rounded-lg px-2 py-1 shadow-sm">
+        <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2 py-1">
           <PlatformLogo platform={w.platform} size={14} />
           <span className="text-[11px] font-medium text-slate-600">{w.platform}</span>
           <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-[#002147] transition-colors" />
