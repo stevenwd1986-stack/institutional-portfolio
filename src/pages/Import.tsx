@@ -3,7 +3,8 @@ import {
   Upload, FileText, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronDown, ChevronRight, ArrowRight,
 } from "lucide-react";
-import { PageShell }     from "../components/shared/PageShell";
+import { PageShell }      from "../components/shared/PageShell";
+import { PlatformLogo }  from "../components/shared/PlatformLogo";
 import { useImportJobs, useUploadCSV } from "../hooks/useImportJobs";
 import type { ImportJob, ImportStatus } from "../hooks/useImportJobs";
 import { cn } from "../lib/utils";
@@ -19,43 +20,14 @@ interface ProviderDef {
   tagline:     string;
   description: string;
   badge?:      string;
-  logo:        React.ReactNode;
 }
 
-// Transact logo mark — green brand
-function TransactMark() {
+// Fallback for Generic CSV — not a real brand so Brandfetch won't have it
+function CsvMark({ size = 48 }: { size?: number }) {
   return (
-    <div className="relative w-12 h-12 shrink-0">
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <rect width="48" height="48" rx="10" fill="#00843D" />
-        {/* Stylised "T" with upward arrow */}
-        <path d="M12 16 H36 M24 16 V34" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M19 28 L24 34 L29 28" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    </div>
-  );
-}
-
-// Finio logo mark — deep purple brand
-function FinioMark() {
-  return (
-    <div className="relative w-12 h-12 shrink-0">
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <rect width="48" height="48" rx="10" fill="#4F46E5" />
-        {/* "F" letterform */}
-        <path d="M14 12 H34 M14 12 V36 M14 24 H28" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    </div>
-  );
-}
-
-// Generic CSV logo mark — slate
-function CsvMark() {
-  return (
-    <div className="relative w-12 h-12 shrink-0">
+    <div className="shrink-0" style={{ width: size, height: size }}>
       <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
         <rect width="48" height="48" rx="10" fill="#475569" />
-        {/* Document lines */}
         <path d="M16 10 H28 L38 20 V40 H16 V10Z" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         <path d="M28 10 V20 H38" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         <path d="M20 27 H32 M20 32 H28" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
@@ -71,23 +43,25 @@ const PROVIDERS: ProviderDef[] = [
     tagline:     "Platform transactions",
     description: "Standard transaction exports from Transact. Trade Date, ISIN, Quantity and Price columns auto-detected.",
     badge:       "Most used",
-    logo:        <TransactMark />,
   },
   {
     id:          "FINIO",
     name:        "Finio",
     tagline:     "Back-office exports",
     description: "Valuation and transaction exports from Finio adviser back-office. tradeDate / unitPrice format supported.",
-    logo:        <FinioMark />,
   },
   {
     id:          "CSV",
     name:        "Generic CSV",
     tagline:     "Any CSV format",
     description: "Import any CSV with a header row. Use the column mapping tool to match your columns to the required fields.",
-    logo:        <CsvMark />,
   },
 ];
+
+function ProviderMark({ id, size = 48 }: { id: Source; size?: number }) {
+  if (id === "CSV") return <CsvMark size={size} />;
+  return <PlatformLogo platform={id} size={size} />;
+}
 
 // ── Column mapping ────────────────────────────────────────────────────────────
 
@@ -398,7 +372,7 @@ export default function Import() {
                   )}
 
                   {/* Logo */}
-                  <div className="mb-4">{p.logo}</div>
+                  <div className="mb-4"><ProviderMark id={p.id} size={48} /></div>
 
                   {/* Name + tagline */}
                   <p className="text-sm font-semibold text-[#0F172A] leading-tight">{p.name}</p>
@@ -565,7 +539,7 @@ export default function Import() {
               },
             ].map(({ provider, fields }) => (
               <div key={provider.id} className="flex gap-3">
-                <div className="shrink-0 scale-75 origin-top-left">{provider.logo}</div>
+                <div className="shrink-0 scale-75 origin-top-left"><ProviderMark id={provider.id} size={48} /></div>
                 <div className="pt-1 min-w-0">
                   <p className="text-xs font-semibold text-[#0F172A] mb-0.5">{provider.name}</p>
                   <p className="text-[11px] text-slate-400 leading-relaxed font-mono break-words">{fields}</p>
