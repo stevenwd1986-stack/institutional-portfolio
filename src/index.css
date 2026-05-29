@@ -1,0 +1,51 @@
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+@import "tailwindcss";
+
+/* ── Oxford Navy light palette — matches advise-platform ─────────────────────
+   slate-950/slate-100 = page bg (light)
+   slate-900           = sidebar (Oxford Navy #002147)
+   slate-800           = card surface (white)
+   slate-300–700       = text/border scale (light)
+   teal-500            = primary navy (buttons, active states)
+   teal-400            = accent blue (active nav text on dark sidebar)       */
+@theme {
+  --color-slate-50:  #FFFFFF;
+  --color-slate-100: #F8FAFC;
+  --color-slate-200: #F1F5F9;
+  --color-slate-300: #E2E8F0;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #FFFFFF;
+  --color-slate-900: #002147;
+  --color-slate-950: #F8FAFC;
+
+  --color-teal-300: #E8F0FE;
+  --color-teal-400: #93C5FD;
+  --color-teal-500: #002147;
+  --color-teal-600: #001530;
+  --color-teal-700: #003366;
+}
+
+:root {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: #F8FAFC;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #F1F5F9; }
+::-webkit-scrollbar-thumb  { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }

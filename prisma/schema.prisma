@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum WrapperType {
+  SIPP
+  ISA
+  GIA
+  OFFSHORE_BOND
+  LISA
+  JISA
+}
+
+enum SubAccountType {
+  DIRECT_HOLDINGS
+  DISCRETIONARY_MANDATE
+  SUB_GIA
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DIVIDEND
+  INTEREST
+  FEE
+  TAX
+  TRANSFER_IN_SPECIE
+  TRANSFER_OUT_SPECIE
+  TRANSFER_IN_CASH
+  TRANSFER_OUT_CASH
+  CORPORATE_ACTION_SPLIT
+  CORPORATE_ACTION_MERGE
+  CONTRIBUTION
+  WITHDRAWAL
+  BENEFIT_CRYSTALLISATION
+}
+
+enum AssetClass {
+  EQUITY
+  FIXED_INCOME
+  CASH
+  ALTERNATIVES
+  PROPERTY
+  COMMODITY
+  MIXED
+}
+
+enum RiskProfile {
+  VERY_LOW
+  LOW
+  MEDIUM_LOW
+  MEDIUM
+  MEDIUM_HIGH
+  HIGH
+  VERY_HIGH
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertCategory {
+  PERFORMANCE_ANOMALY
+  DATA_GAP
+  PENDING_TRANSFER
+  COMPLIANCE_FLAG
+  RECONCILIATION_ERROR
+}
+
+enum LedgerSide {
+  DEBIT
+  CREDIT
+}
+
+// ─── Hierarchy: Firm → Adviser → Client → TaxWrapper → SubAccount → Holding → Transaction ─────
+
+model Firm {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  fca_reference String?  @unique
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz
+  updated_at    DateTime @updatedAt @db.Timestamptz
+
+  advisers            Adviser[]
+  clients             Client[]
+  benchmarks          Benchmark[]
+  integration_configs IntegrationConfig[]
+  import_jobs         ImportJob[]
+  alerts              Alert[]
+}
+
+model Adviser {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id      String   @db.Uuid
+  auth_user_id String?  @unique @db.Uuid
+  first_name   String
+  last_name    String
+  email        String   @unique
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz
+  updated_at   DateTime @updatedAt @db.Timestamptz
+
+  firm    Firm     @relation(fields: [firm_id], references: [id])
+  clients Client[]
+
+  @@index([firm_id])
+}
+
+model Client {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id            String      @db.Uuid
+  adviser_id         String      @db.Uuid
+  first_name         String
+  last_name          String
+  date_of_birth      DateTime?   @db.Date
+  national_insurance String?
+  risk_profile       RiskProfile @default(MEDIUM)
+  last_review_date   DateTime?   @db.Date
+  is_active          Boolean     @default(true)
+  created_at         DateTime    @default(now()) @db.Timestamptz
+  updated_at         DateTime    @updatedAt @db.Timestamptz
+
+  firm         Firm         @relation(fields: [firm_id], references: [id])
+  adviser      Adviser      @relation(fields: [adviser_id], references: [id])
+  tax_wrappers TaxWrapper[]
+  alerts       Alert[]
+
+  @@index([firm_id])
+  @@index([adviser_id])
+}
+
+model TaxWrapper {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id            String      @db.Uuid
+  client_id          String      @db.Uuid
+  wrapper_type       WrapperType
+  platform_name      String?
+  platform_reference String?
+  currency           String      @default("GBP") @db.Char(3)
+  is_active          Boolean     @default(true)
+  opened_date        DateTime?   @db.Date
+  closed_date        DateTime?   @db.Date
+  created_at         DateTime    @default(now()) @db.Timestamptz
+  updated_at         DateTime    @updatedAt @db.Timestamptz
+
+  client       Client       @relation(fields: [client_id], references: [id])
+  sub_accounts SubAccount[]
+  valuations   Valuation[]
+
+  @@index([firm_id])
+  @@index([client_id])
+  @@index([wrapper_type])
+}
+
+model SubAccount {
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id               String         @db.Uuid
+  tax_wrapper_id        String         @db.Uuid
+  name                  String
+  sub_account_type      SubAccountType @default(DIRECT_HOLDINGS)
+  discretionary_manager String?
+  is_active             Boolean        @default(true)
+  created_at            DateTime       @default(now()) @db.Timestamptz
+  updated_at            DateTime       @updatedAt @db.Timestamptz
+
+  tax_wrapper  TaxWrapper    @relation(fields: [tax_wrapper_id], references: [id])
+  holdings     Holding[]
+  transactions Transaction[]
+
+  @@index([firm_id])
+  @@index([tax_wrapper_id])
+}
+
+model Asset {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  isin        String?    @unique @db.Char(12)
+  sedol       String?    @unique @db.Char(7)
+  ticker      String?
+  name        String
+  asset_class AssetClass @default(EQUITY)
+  currency    String     @default("GBP") @db.Char(3)
+  exchange    String?
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now()) @db.Timestamptz
+
+  prices       AssetPrice[]
+  holdings     Holding[]
+  transactions Transaction[]
+}
+
+model AssetPrice {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asset_id   String   @db.Uuid
+  price_date DateTime @db.Date
+  open       Decimal? @db.Decimal(18, 6)
+  high       Decimal? @db.Decimal(18, 6)
+  low        Decimal? @db.Decimal(18, 6)
+  close      Decimal  @db.Decimal(18, 6)
+  volume     BigInt?
+  currency   String   @default("GBP") @db.Char(3)
+
+  asset Asset @relation(fields: [asset_id], references: [id])
+
+  @@unique([asset_id, price_date])
+  @@index([price_date])
+}
+
+model Holding {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id         String    @db.Uuid
+  sub_account_id  String    @db.Uuid
+  asset_id        String    @db.Uuid
+  units           Decimal   @db.Decimal(20, 8)
+  avg_cost_basis  Decimal   @db.Decimal(18, 6)
+  currency        String    @default("GBP") @db.Char(3)
+  last_price      Decimal?  @db.Decimal(18, 6)
+  last_price_date DateTime? @db.Date
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  sub_account SubAccount @relation(fields: [sub_account_id], references: [id])
+  asset       Asset      @relation(fields: [asset_id], references: [id])
+
+  @@unique([sub_account_id, asset_id])
+  @@index([firm_id])
+}
+
+model Transaction {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id              String          @db.Uuid
+  sub_account_id       String          @db.Uuid
+  asset_id             String?         @db.Uuid
+  transaction_type     TransactionType
+  trade_date           DateTime        @db.Date
+  settlement_date      DateTime?       @db.Date
+  units                Decimal?        @db.Decimal(20, 8)
+  price                Decimal?        @db.Decimal(18, 6)
+  gross_amount         Decimal         @db.Decimal(18, 4)
+  net_amount           Decimal         @db.Decimal(18, 4)
+  fees                 Decimal         @default(0) @db.Decimal(18, 4)
+  currency             String          @default("GBP") @db.Char(3)
+  is_book_over         Boolean         @default(false)
+  platform_transfer_id String?         @db.Uuid
+  external_ref         String?
+  notes                String?
+  created_at           DateTime        @default(now()) @db.Timestamptz
+
+  sub_account       SubAccount        @relation(fields: [sub_account_id], references: [id])
+  asset             Asset?            @relation(fields: [asset_id], references: [id])
+  platform_transfer PlatformTransfer? @relation(fields: [platform_transfer_id], references: [id])
+  ledger_entries    LedgerEntry[]
+
+  @@index([firm_id])
+  @@index([sub_account_id])
+  @@index([trade_date])
+  @@index([transaction_type])
+}
+
+model PlatformTransfer {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id             String    @db.Uuid
+  from_platform       String
+  to_platform         String
+  transfer_date       DateTime  @db.Date
+  settled_date        DateTime? @db.Date
+  is_complete         Boolean   @default(false)
+  original_cost_basis Decimal?  @db.Decimal(18, 6)
+  notes               String?
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
+
+  transactions Transaction[]
+}
+
+model LedgerEntry {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id        String     @db.Uuid
+  transaction_id String     @db.Uuid
+  account_code   String
+  side           LedgerSide
+  amount         Decimal    @db.Decimal(18, 4)
+  currency       String     @default("GBP") @db.Char(3)
+  created_at     DateTime   @default(now()) @db.Timestamptz
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id])
+
+  @@index([transaction_id])
+  @@index([firm_id])
+}
+
+model Valuation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id        String   @db.Uuid
+  tax_wrapper_id String   @db.Uuid
+  valuation_date DateTime @db.Date
+  market_value   Decimal  @db.Decimal(18, 4)
+  cost_basis     Decimal  @db.Decimal(18, 4)
+  currency       String   @default("GBP") @db.Char(3)
+  created_at     DateTime @default(now()) @db.Timestamptz
+
+  tax_wrapper TaxWrapper @relation(fields: [tax_wrapper_id], references: [id])
+
+  @@unique([tax_wrapper_id, valuation_date])
+  @@index([firm_id, valuation_date])
+}
+
+model Benchmark {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id           String?  @db.Uuid
+  name              String
+  description       String?
+  is_blended        Boolean  @default(false)
+  blend_composition Json?
+  currency          String   @default("GBP") @db.Char(3)
+  created_at        DateTime @default(now()) @db.Timestamptz
+
+  firm   Firm?            @relation(fields: [firm_id], references: [id])
+  prices BenchmarkPrice[]
+}
+
+model BenchmarkPrice {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  benchmark_id String   @db.Uuid
+  price_date   DateTime @db.Date
+  level        Decimal  @db.Decimal(18, 6)
+  currency     String   @default("GBP") @db.Char(3)
+
+  benchmark Benchmark @relation(fields: [benchmark_id], references: [id])
+
+  @@unique([benchmark_id, price_date])
+  @@index([price_date])
+}
+
+model IntegrationConfig {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id           String    @db.Uuid
+  platform          String
+  api_key_encrypted String
+  api_base_url      String?
+  is_active         Boolean   @default(true)
+  last_sync_at      DateTime? @db.Timestamptz
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @updatedAt @db.Timestamptz
+
+  firm Firm @relation(fields: [firm_id], references: [id])
+
+  @@unique([firm_id, platform])
+}
+
+model ImportJob {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id        String       @db.Uuid
+  source         String
+  status         ImportStatus @default(PENDING)
+  storage_path   String?
+  rows_total     Int          @default(0)
+  rows_processed Int          @default(0)
+  rows_failed    Int          @default(0)
+  error_log      Json?
+  started_at     DateTime?    @db.Timestamptz
+  completed_at   DateTime?    @db.Timestamptz
+  created_at     DateTime     @default(now()) @db.Timestamptz
+
+  firm Firm @relation(fields: [firm_id], references: [id])
+
+  @@index([firm_id])
+}
+
+model Alert {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firm_id     String        @db.Uuid
+  client_id   String?       @db.Uuid
+  category    AlertCategory
+  severity    AlertSeverity @default(WARNING)
+  title       String
+  message     String
+  metadata    Json?
+  is_resolved Boolean       @default(false)
+  resolved_at DateTime?     @db.Timestamptz
+  created_at  DateTime      @default(now()) @db.Timestamptz
+
+  firm   Firm    @relation(fields: [firm_id], references: [id])
+  client Client? @relation(fields: [client_id], references: [id])
+
+  @@index([firm_id, is_resolved])
+}
