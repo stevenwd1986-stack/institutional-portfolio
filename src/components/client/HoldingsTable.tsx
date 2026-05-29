@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useHoldings }  from "../../hooks/useHoldings";
-import { cn, fmt, fmtDecimal } from "../../lib/utils";
+import { cn, fmt } from "../../lib/utils";
 import { ChevronDown }  from "lucide-react";
 
 const WRAPPER_COLOR: Record<string, string> = {

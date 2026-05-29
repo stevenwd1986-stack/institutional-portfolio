@@ -3,7 +3,6 @@ import { X, PlusCircle, ArrowDownCircle, Layers, AlertTriangle, CheckCircle2, In
 import { cn, fmt } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { useAddBondTransaction } from "../../hooks/useWrapperTransactions";
-import type { BondTransaction } from "../../hooks/useWrapperTransactions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

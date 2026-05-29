@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, Minus, Lock, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { cn, fmtPct } from "../../lib/utils";
 import { useConsolidatedPerformance } from "../../hooks/useConsolidatedPerformance";
-import type { ReturnPeriod, PeriodMetrics } from "../../hooks/useConsolidatedPerformance";
+import type { ReturnPeriod } from "../../hooks/useConsolidatedPerformance";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,42 +23,6 @@ const WRAPPER_COLORS: Record<string, string> = {
   LISA:          "text-pink-700",
   JISA:          "text-blue-700",
 };
-
-// ── Cell helpers ─────────────────────────────────────────────────────────────
-
-function ReturnCell({
-  metrics, ann, onClick,
-}: {
-  metrics: PeriodMetrics;
-  ann:     boolean;
-  onClick?: () => void;
-}) {
-  if (!metrics.available) {
-    return (
-      <td className="px-4 py-3 text-center">
-        <span className="text-slate-300 text-xs">—</span>
-      </td>
-    );
-  }
-
-  const value   = ann ? metrics.twr_ann : metrics.twr;
-  const isPos   = value >= 0;
-  const fmt     = fmtPct(value, 1);
-
-  return (
-    <td
-      className={cn(
-        "px-4 py-3 text-right tabular-nums text-sm font-semibold",
-        isPos ? "text-emerald-600" : "text-rose-500",
-        onClick && "cursor-pointer hover:underline decoration-dotted underline-offset-2"
-      )}
-      onClick={onClick}
-    >
-      {fmt}
-      {ann && <span className="text-[10px] font-normal ml-0.5 opacity-60">p.a.</span>}
-    </td>
-  );
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 

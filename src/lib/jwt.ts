@@ -39,7 +39,7 @@ export async function verifyAdviserToken(token: string): Promise<AdviserClaims |
     // Verify signature
     const signingInput = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
     const signature    = b64urlDecode(sigB64)
-    const valid = await crypto.subtle.verify('HMAC', key, signature, signingInput)
+    const valid = await crypto.subtle.verify('HMAC', key, signature as unknown as BufferSource, signingInput)
     if (!valid) return null
 
     // Decode payload

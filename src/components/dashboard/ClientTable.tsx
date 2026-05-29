@@ -33,7 +33,7 @@ export function ClientTable() {
       return m * `${a.first_name}${a.last_name}`.localeCompare(`${b.first_name}${b.last_name}`);
     if (sortKey === "last_updated")
       return m * a.last_updated.localeCompare(b.last_updated);
-    return m * ((a as Record<string, number>)[sortKey] - (b as Record<string, number>)[sortKey]);
+    return m * ((a as unknown as Record<string, number>)[sortKey] - (b as unknown as Record<string, number>)[sortKey]);
   });
 
   function handleSort(key: SortKey) {

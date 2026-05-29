@@ -17,7 +17,7 @@ export interface PerformanceData {
   };
 }
 
-function generateDemoSeries(wrapperType: string, periodDays: number, baseValue: number, annualReturn: number) {
+function generateDemoSeries(_wrapperType: string, periodDays: number, baseValue: number, annualReturn: number) {
   const points: { date: string; value: number }[] = [];
   const today = new Date();
   const start = new Date(today);

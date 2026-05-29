@@ -150,7 +150,7 @@ export function useAddBondTransaction(wrapperId: string, yearsHeld = 8) {
 
   return useMutation<BondTransaction[], Error, NewBondTxInput>({
     mutationFn: async (input) => {
-      const existing: BondTransaction[] = qc.getQueryData(["bond-txns", wrapperId]) ?? recompute(SEED_TRANSACTIONS[wrapperId] ?? [INITIAL], yearsHeld);
+      qc.getQueryData(["bond-txns", wrapperId]) ?? recompute(SEED_TRANSACTIONS[wrapperId] ?? [INITIAL], yearsHeld);
 
       const id = `bt-${Date.now()}`;
       let newTx: BondTransaction;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, TrendingUp, TrendingDown, Shield, Info, AlertTriangle, CheckCircle2, Clock, PlusCircle } from "lucide-react";
 import { PageShell }                  from "../components/shared/PageShell";
@@ -464,7 +464,7 @@ export default function WrapperDetail() {
 
         {/* ── Holdings + Tax analysis ──────────────────────────────────────── */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5">
-          <HoldingsTable holdings={wrapper.holdings} wrapperType={wrapper.wrapper_type} />
+          <HoldingsTable holdings={wrapper.holdings} />
           <TaxPanel tax={wrapper.tax} />
         </div>
 

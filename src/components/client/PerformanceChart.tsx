@@ -189,7 +189,7 @@ export function PerformanceChart({ clientId }: { clientId: string }) {
           />
           <YAxis
             scale={scale === "log" ? "log" : "linear"}
-            domain={scale === "log" ? ["auto", "auto"] : [undefined, undefined]}
+            domain={scale === "log" ? (["auto", "auto"] as [string, string]) : undefined}
             tick={{ fontSize: 10, fill: "#94A3B8" }}
             tickLine={false}
             axisLine={false}
