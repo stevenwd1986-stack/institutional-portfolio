@@ -64,7 +64,8 @@ const DEMO_WRAPPERS: Record<string, WrapperSummary[]> = {
       value: 177_300, cost_basis: 145_000, performance_1y: 0.071,
       contributions_total: 145_000, is_closed: false,
       sub_accounts: [
-        { id: "sa4-1", name: "Main Portfolio", type: "DIRECT_HOLDINGS", value: 177_300 },
+        { id: "sa4-1", name: "GIA Sub-plan A",   type: "SUB_GIA", value: 112_400 },
+        { id: "sa4-2", name: "GIA Sub-plan B",   type: "SUB_GIA", value:  64_900 },
       ],
     },
     // ── Historically closed — Quilter S&S ISA transferred to Transact ISA (w2) in Jan 2022
@@ -112,7 +113,8 @@ const DEMO_WRAPPERS: Record<string, WrapperSummary[]> = {
       value: 210_500, cost_basis: 175_000, performance_1y: 0.102,
       contributions_total: 175_000, is_closed: false,
       sub_accounts: [
-        { id: "sa8-1", name: "Main Portfolio", type: "DIRECT_HOLDINGS", value: 210_500 },
+        { id: "sa8-1", name: "GIA Sub-plan 1 — Growth",  type: "SUB_GIA", value: 140_000 },
+        { id: "sa8-2", name: "GIA Sub-plan 2 — Income",  type: "SUB_GIA", value:  70_500 },
       ],
     },
     // ── Spousal ISA (APS) transferred in from deceased spouse — 2023

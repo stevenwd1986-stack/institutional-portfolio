@@ -2,7 +2,7 @@ import { useNavigate }  from "react-router-dom";
 import { useWrappers }  from "../../hooks/useWrappers";
 import { fmt, fmtPct }  from "../../lib/utils";
 import { cn }           from "../../lib/utils";
-import { ChevronRight, Archive, Layers, FileText } from "lucide-react";
+import { ChevronRight, Archive, Layers, FileText, Wallet } from "lucide-react";
 import type { WrapperSummary } from "../../hooks/useWrappers";
 
 // ── Platform logo marks ───────────────────────────────────────────────────────
@@ -59,20 +59,45 @@ const WRAPPER_STYLE: Record<string, { label: string; accent: string; bg: string;
 
 function SubAccountChips({ wrapper }: { wrapper: WrapperSummary }) {
   const { sub_accounts } = wrapper;
-  if (!sub_accounts || sub_accounts.length <= 1) return null;
+  if (!sub_accounts || sub_accounts.length === 0) return null;
+
+  const hasGIA = sub_accounts.some((sa) => sa.type === "SUB_GIA");
 
   return (
-    <div className="mt-2.5 flex flex-wrap gap-1.5">
-      {sub_accounts.map((sa) => (
-        <span
-          key={sa.id}
-          className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-white/60 border border-[#E2E8F0] rounded-md px-1.5 py-0.5"
-        >
-          <Layers className="w-2.5 h-2.5 opacity-60 shrink-0" />
-          <span className="truncate max-w-[110px]">{sa.name}</span>
-          <span className="text-slate-400 tabular-nums">{fmt(sa.value)}</span>
-        </span>
-      ))}
+    <div className="mt-3 space-y-2">
+      {/* GIA sub-plan section — shown when bond contains GIA sub-plans */}
+      {hasGIA && (
+        <div className="border border-violet-100 rounded-lg bg-violet-50/60 px-2.5 py-2">
+          <p className="text-[9px] font-semibold text-violet-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <Wallet className="w-2.5 h-2.5" />
+            GIA Sub-plans
+          </p>
+          <div className="space-y-1">
+            {sub_accounts.filter((sa) => sa.type === "SUB_GIA").map((sa) => (
+              <div key={sa.id} className="flex items-center justify-between">
+                <span className="text-[10px] text-violet-700 truncate max-w-[140px]">{sa.name}</span>
+                <span className="text-[10px] text-violet-600 tabular-nums font-medium">{fmt(sa.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Non-GIA sub-accounts (direct holdings, DFM mandates) */}
+      {sub_accounts.filter((sa) => sa.type !== "SUB_GIA").length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {sub_accounts.filter((sa) => sa.type !== "SUB_GIA").map((sa) => (
+            <span
+              key={sa.id}
+              className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-[#F8FAFC] border border-[#E2E8F0] rounded-md px-1.5 py-0.5"
+            >
+              <Layers className="w-2.5 h-2.5 opacity-60 shrink-0" />
+              <span className="truncate max-w-[110px]">{sa.name}</span>
+              <span className="text-slate-400 tabular-nums">{fmt(sa.value)}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
