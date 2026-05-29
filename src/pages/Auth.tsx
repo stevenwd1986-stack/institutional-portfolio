@@ -10,15 +10,17 @@ export default function Auth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("token");
+    async function verify() {
+      const token = new URLSearchParams(window.location.search).get("token");
 
-    if (!token) {
-      setError("No access token provided.");
-      setLoading(false);
-      return;
-    }
+      if (!token) {
+        setError("No access token provided.");
+        setLoading(false);
+        return;
+      }
 
-    verifyAdviserToken(token).then((claims) => {
+      const claims = await verifyAdviserToken(token);
+
       if (!claims) {
         setError("Invalid or expired access token. Please return to the adviser platform and try again.");
         setLoading(false);
@@ -41,7 +43,9 @@ export default function Auth() {
       }));
 
       navigate("/dashboard", { replace: true });
-    });
+    }
+
+    verify();
   }, [navigate]);
 
   return (
