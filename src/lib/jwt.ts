@@ -2,11 +2,13 @@
 // Returns the decoded payload or null if invalid/expired.
 
 export interface AdviserClaims {
-  sub:   string
-  email: string
-  name:  string
-  iat:   number
-  exp:   number
+  sub:            string
+  email:          string
+  name:           string
+  iat:            number
+  exp:            number
+  access_token?:  string
+  refresh_token?: string
 }
 
 function b64urlDecode(str: string): Uint8Array {

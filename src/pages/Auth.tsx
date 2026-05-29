@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate }         from "react-router-dom";
 import { verifyAdviserToken }  from "../lib/jwt";
+import { supabase }            from "../lib/supabase";
 import { Loader2, ShieldAlert } from "lucide-react";
 
 export default function Auth() {
@@ -22,6 +23,15 @@ export default function Auth() {
         setError("Invalid or expired access token. Please return to the adviser platform and try again.");
         setLoading(false);
         return;
+      }
+
+      // Establish a Supabase auth session so RLS policies allow
+      // the shared advise-platform database to return real data.
+      if (claims.access_token && claims.refresh_token) {
+        await supabase.auth.setSession({
+          access_token:  claims.access_token,
+          refresh_token: claims.refresh_token,
+        });
       }
 
       sessionStorage.setItem("adviser", JSON.stringify({
