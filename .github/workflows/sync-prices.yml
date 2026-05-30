@@ -1,0 +1,46 @@
+name: Sync EODHD Prices
+
+on:
+  schedule:
+    # 22:30 UTC Mon–Fri — after LSE (4:30pm) and US (9pm UK) markets close
+    - cron: '30 22 * * 1-5'
+  workflow_dispatch:
+    # Also allows manual trigger from GitHub Actions tab
+
+jobs:
+  sync:
+    name: Fetch EOD prices → Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger sync-prices edge function
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            https://sjpywyynhgmqvblptkbi.supabase.co/functions/v1/sync-prices \
+            -H "Authorization: Bearer ${{ secrets.SYNC_PRICES_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Price sync failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          # Print summary
+          echo "$BODY" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          totals = d.get('totals', {})
+          print(f\"Instrument prices updated: {totals.get('instrument_prices', 0)}\")
+          print(f\"Asset prices updated:      {totals.get('asset_prices', 0)}\")
+          print(f\"FX GBP/USD:                {d.get('fx_gbpusd', 'n/a')}\")
+          for ex in d.get('exchanges', []):
+            status = 'ERROR: ' + ex['error'] if ex.get('error') else 'ok'
+            print(f\"  {ex['exchange']:8} instruments={ex['instrument_prices_upserted']:5}  assets={ex['asset_prices_upserted']:4}  {status}\")
+          "
