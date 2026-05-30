@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, TrendingUp, TrendingDown, Shield, Info, AlertTriangle, CheckCircle2, Clock, PlusCircle } from "lucide-react";
 import { PageShell }                  from "../components/shared/PageShell";
+import { PlatformLogo, FundManagerLogo } from "../components/shared/PlatformLogo";
 import { useWrapper }                 from "../hooks/useWrapper";
 import { useClient }                  from "../hooks/useClient";
 import { fmt, fmtPct }                from "../lib/utils";
@@ -93,9 +94,14 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
           <tbody>
             {holdings.map((h) => (
               <tr key={h.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                <td className="px-4 py-3.5 text-left max-w-[220px]">
-                  <p className="text-sm text-[#0F172A] font-medium truncate">{h.asset_name}</p>
-                  {h.isin && <p className="text-xs text-slate-400 font-mono mt-0.5">{h.isin}</p>}
+                <td className="px-4 py-3.5 text-left max-w-[240px]">
+                  <div className="flex items-center gap-2.5">
+                    <FundManagerLogo name={h.asset_name} size={20} />
+                    <div className="min-w-0">
+                      <p className="text-sm text-[#0F172A] font-medium truncate">{h.asset_name}</p>
+                      {h.isin && <p className="text-xs text-slate-400 font-mono mt-0.5">{h.isin}</p>}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <span className={cn("text-xs font-medium", ASSET_CLASS_COLOR[h.asset_class] ?? "text-slate-500")}>
@@ -404,7 +410,10 @@ export default function WrapperDetail() {
                   <span className={cn("text-sm font-semibold px-2.5 py-0.5 rounded-full border", meta.accent, meta.bg, meta.border)}>
                     {meta.label}
                   </span>
-                  <span className="text-xs text-slate-400">{wrapper.platform}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <PlatformLogo platform={wrapper.platform} size={16} />
+                    {wrapper.platform}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{meta.fullName}</p>
               </div>

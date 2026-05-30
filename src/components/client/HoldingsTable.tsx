@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { useHoldings }  from "../../hooks/useHoldings";
-import { cn, fmt } from "../../lib/utils";
-import { ChevronDown }  from "lucide-react";
+import { useHoldings }       from "../../hooks/useHoldings";
+import { cn, fmt }           from "../../lib/utils";
+import { ChevronDown }       from "lucide-react";
+import { FundManagerLogo }   from "../shared/PlatformLogo";
 
 const WRAPPER_COLOR: Record<string, string> = {
   SIPP:          "text-[#002147]  bg-[#E8F0FE]   border-[#002147]/20",
@@ -72,13 +73,18 @@ export function HoldingsTable({ clientId }: { clientId: string }) {
                         isExpanded && "rotate-180"
                       )} />
                     </td>
-                    <td className="px-4 py-3.5 text-left max-w-[200px]">
-                      <p className="text-sm text-[#0F172A] font-medium truncate">{h.asset_name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {h.isin && <span className="text-xs text-slate-400 font-mono">{h.isin}</span>}
-                        <span className={cn("text-xs font-medium", CLASS_COLOR[h.asset_class] ?? "text-slate-500")}>
-                          {h.asset_class.replace("_", " ")}
-                        </span>
+                    <td className="px-4 py-3.5 text-left max-w-[220px]">
+                      <div className="flex items-center gap-2.5">
+                        <FundManagerLogo name={h.asset_name} size={20} />
+                        <div className="min-w-0">
+                          <p className="text-sm text-[#0F172A] font-medium truncate">{h.asset_name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {h.isin && <span className="text-xs text-slate-400 font-mono">{h.isin}</span>}
+                            <span className={cn("text-xs font-medium", CLASS_COLOR[h.asset_class] ?? "text-slate-500")}>
+                              {h.asset_class.replace("_", " ")}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-right">
