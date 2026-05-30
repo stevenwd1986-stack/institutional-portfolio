@@ -1,8 +1,10 @@
-import { useNavigate }  from "react-router-dom";
-import { ArrowLeft, FileText } from "lucide-react";
+import { useState }          from "react";
+import { useNavigate }        from "react-router-dom";
+import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import { cn, fmt, fmtDate }   from "../../lib/utils";
 import { Button }              from "../ui/button";
 import { Badge }               from "../ui/badge";
+import { AssignAdviserModal }  from "../shared/AssignAdviserModal";
 
 const RISK_BADGE: Record<string, string> = {
   VERY_LOW:    "bg-sky-50      text-sky-600    border-sky-200",
@@ -27,9 +29,11 @@ interface ClientHeaderProps {
 }
 
 export function ClientHeader({ client }: ClientHeaderProps) {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const [showModal, setShowModal] = useState(false);
 
   return (
+    <>
     <div className="bg-white border border-[#E2E8F0] rounded-xl px-6 py-5 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div className="flex items-start gap-4">
@@ -46,7 +50,14 @@ export function ClientHeader({ client }: ClientHeaderProps) {
               {client.firstName} {client.lastName}
             </h1>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              <span className="text-sm text-slate-500">{client.adviserName}</span>
+              <button
+                onClick={() => setShowModal(true)}
+                className="group/adv flex items-center gap-1 text-sm text-slate-500 hover:text-[#002147] transition-colors"
+                aria-label="Reassign adviser"
+              >
+                {client.adviserName}
+                <Pencil className="w-3 h-3 opacity-0 group-hover/adv:opacity-100 transition-opacity" />
+              </button>
               <Badge
                 variant="outline"
                 className={cn("border", RISK_BADGE[client.riskProfile] ?? RISK_BADGE.MEDIUM)}
@@ -76,5 +87,15 @@ export function ClientHeader({ client }: ClientHeaderProps) {
         </div>
       </div>
     </div>
+
+    {showModal && (
+      <AssignAdviserModal
+        clientIds={[client.id]}
+        clientLabel={`${client.firstName} ${client.lastName}`}
+        currentAdviserName={client.adviserName}
+        onClose={() => setShowModal(false)}
+      />
+    )}
+  </>
   );
 }

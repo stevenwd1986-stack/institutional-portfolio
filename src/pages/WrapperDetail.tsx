@@ -67,10 +67,13 @@ const ASSET_CLASS_COLOR: Record<string, string> = {
 };
 
 function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
-  const total       = holdings.reduce((s, h) => s + h.market_value,    0);
-  const totalCost   = holdings.reduce((s, h) => s + h.cost_basis,      0);
-  const totalGain   = holdings.reduce((s, h) => s + h.unrealised_gain, 0);
-  const totalPct    = totalCost > 0 ? totalGain / totalCost : 0;
+  const total            = holdings.reduce((s, h) => s + h.market_value,    0);
+  const totalCost        = holdings.reduce((s, h) => s + h.cost_basis,      0);
+  const totalUnrealised  = holdings.reduce((s, h) => s + h.unrealised_gain, 0);
+  const totalRealised    = holdings.reduce((s, h) => s + h.realised_gain,   0);
+  const totalPct         = totalCost > 0 ? totalUnrealised / totalCost : 0;
+
+  const headers = ["Asset", "Class", "Units", "Price", "Value", "Cost", "Unrealised G/L", "Realised G/L", "% Return", "IRR"];
 
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
@@ -83,7 +86,7 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-              {["Asset", "Class", "Units", "Price", "Value", "Cost", "Gain / Loss", "%"].map((h, i) => (
+              {headers.map((h, i) => (
                 <th key={h} className={cn(
                   "px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap",
                   i === 0 ? "text-left" : "text-right"
@@ -94,7 +97,7 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
           <tbody>
             {holdings.map((h) => (
               <tr key={h.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                <td className="px-4 py-3.5 text-left max-w-[240px]">
+                <td className="px-4 py-3.5 text-left">
                   <div className="flex items-center gap-2.5">
                     <FundManagerLogo name={h.asset_name} size={20} />
                     <div className="min-w-0">
@@ -127,11 +130,18 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
                   {h.unrealised_gain >= 0 ? "+" : ""}{fmt(h.unrealised_gain)}
                 </td>
                 <td className={cn(
+                  "px-4 py-3.5 text-right text-sm font-semibold tabular-nums",
+                  h.realised_gain > 0 ? "text-emerald-600" : h.realised_gain < 0 ? "text-rose-500" : "text-slate-300"
+                )}>
+                  {h.realised_gain === 0 ? "—" : <>{h.realised_gain > 0 ? "+" : ""}{fmt(h.realised_gain)}</>}
+                </td>
+                <td className={cn(
                   "px-4 py-3.5 text-right text-xs font-semibold tabular-nums",
                   h.pct_gain >= 0 ? "text-emerald-600" : "text-rose-500"
                 )}>
                   {h.pct_gain >= 0 ? "+" : ""}{(h.pct_gain * 100).toFixed(1)}%
                 </td>
+                <td className="px-4 py-3.5 text-right text-xs text-slate-300 tabular-nums">—</td>
               </tr>
             ))}
           </tbody>
@@ -140,12 +150,16 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
               <td colSpan={4} className="px-4 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</td>
               <td className="px-4 py-3.5 text-right text-sm font-bold text-[#0F172A] tabular-nums">{fmt(total)}</td>
               <td className="px-4 py-3.5 text-right text-xs text-slate-500 tabular-nums">{fmt(totalCost)}</td>
-              <td className={cn("px-4 py-3.5 text-right text-sm font-bold tabular-nums", totalGain >= 0 ? "text-emerald-600" : "text-rose-500")}>
-                {totalGain >= 0 ? "+" : ""}{fmt(totalGain)}
+              <td className={cn("px-4 py-3.5 text-right text-sm font-bold tabular-nums", totalUnrealised >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                {totalUnrealised >= 0 ? "+" : ""}{fmt(totalUnrealised)}
+              </td>
+              <td className={cn("px-4 py-3.5 text-right text-sm font-bold tabular-nums", totalRealised > 0 ? "text-emerald-600" : totalRealised < 0 ? "text-rose-500" : "text-slate-300")}>
+                {totalRealised === 0 ? "—" : <>{totalRealised > 0 ? "+" : ""}{fmt(totalRealised)}</>}
               </td>
               <td className={cn("px-4 py-3.5 text-right text-xs font-bold tabular-nums", totalPct >= 0 ? "text-emerald-600" : "text-rose-500")}>
                 {totalPct >= 0 ? "+" : ""}{(totalPct * 100).toFixed(1)}%
               </td>
+              <td className="px-4 py-3.5 text-right text-xs text-slate-300">—</td>
             </tr>
           </tfoot>
         </table>
@@ -193,26 +207,32 @@ function GIAPanel({ tax }: { tax: GIATaxDetails }) {
         <h3 className="text-sm font-semibold text-[#0F172A]">CGT Position</h3>
         <p className="text-xs text-slate-500 mt-0.5">2024/25 tax year</p>
       </div>
-      <div className="px-5 py-3">
-        <TaxRow label="Total unrealised gains"     value={fmt(tax.unrealised_gains)} />
-        <TaxRow label="CGT annual exempt amount"   value={`−${fmt(tax.cgt_annual_exempt)}`} sub />
-        <Divider />
-        <TaxRow label="Net taxable gains"          value={fmt(tax.taxable_gains)} highlight="warning" />
-        <Divider />
-        <TaxRow label="Estimated tax at 20% (basic rate)"  value={fmt(tax.tax_basic)}  sub />
-        <TaxRow label="Estimated tax at 24% (higher rate)" value={fmt(tax.tax_higher)} sub highlight="warning" />
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">Gain by position</p>
-        {tax.position_gains.map((p) => (
-          <div key={p.name} className="flex items-center justify-between py-1.5">
-            <span className="text-xs text-slate-500 truncate max-w-[160px]">{p.name}</span>
-            <div className="text-right">
-              <span className="text-xs font-semibold text-emerald-600 tabular-nums">+{fmt(p.gain)}</span>
-              <span className="text-xs text-slate-400 ml-2 tabular-nums">{((p.gain / p.cost) * 100).toFixed(1)}%</span>
+      <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#E2E8F0]">
+        <div className="md:pr-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">CGT Summary</p>
+          <TaxRow label="Total unrealised gains"   value={fmt(tax.unrealised_gains)} />
+          <TaxRow label="CGT annual exempt amount" value={`−${fmt(tax.cgt_annual_exempt)}`} sub />
+          <Divider />
+          <TaxRow label="Net taxable gains"        value={fmt(tax.taxable_gains)} highlight="warning" />
+        </div>
+        <div className="pt-4 md:pt-0 md:px-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Estimated Tax</p>
+          <TaxRow label="At 20% (basic rate)"  value={fmt(tax.tax_basic)} sub />
+          <TaxRow label="At 24% (higher rate)" value={fmt(tax.tax_higher)} sub highlight="warning" />
+        </div>
+        <div className="pt-4 md:pt-0 md:pl-6">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Gain by Position</p>
+          {tax.position_gains.map((p) => (
+            <div key={p.name} className="flex items-center justify-between py-1.5">
+              <span className="text-xs text-slate-500 truncate max-w-[200px]">{p.name}</span>
+              <div className="text-right shrink-0 ml-2">
+                <span className="text-xs font-semibold text-emerald-600 tabular-nums">+{fmt(p.gain)}</span>
+                <span className="text-xs text-slate-400 ml-2 tabular-nums">{((p.gain / p.cost) * 100).toFixed(1)}%</span>
+              </div>
             </div>
-          </div>
-        ))}
-        <PlanningTip text={`£${tax.cgt_annual_exempt.toLocaleString()} of gains can be crystallised this tax year free of CGT. Consider bed & ISA (sell and rebuy inside ISA) or bed & SIPP to shelter future gains from further growth.`} />
+          ))}
+          <PlanningTip text={`£${tax.cgt_annual_exempt.toLocaleString()} of gains can be crystallised free of CGT. Consider bed & ISA or bed & SIPP to shelter future gains from further growth.`} />
+        </div>
       </div>
     </div>
   );
@@ -226,22 +246,27 @@ function OffshoresBondPanel({ tax }: { tax: OffshoresBondTaxDetails }) {
         <h3 className="text-sm font-semibold text-[#0F172A]">Chargeable Event Analysis</h3>
         <p className="text-xs text-slate-500 mt-0.5">RL360 policy — held {tax.years_held} years</p>
       </div>
-      <div className="px-5 py-3">
-        <TaxRow label="Total premiums paid"        value={fmt(tax.total_premiums)} />
-        <TaxRow label="Current surrender value"    value={fmt(tax.total_premiums + surrenderToday)} />
-        <Divider />
-        <TaxRow label="Chargeable event gain"      value={fmt(surrenderToday)} highlight="warning" />
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">5% Withdrawal Allowance</p>
-        <TaxRow label={`Annual allowance (5% of premiums)`} value={fmt(tax.annual_allowance_5pct) + " /yr"} />
-        <TaxRow label={`Cumulative (${tax.years_held} yrs)`} value={fmt(tax.cumulative_allowance)} sub />
-        <TaxRow label="Withdrawn to date"          value={fmt(tax.allowance_used)}     sub />
-        <TaxRow label="Available to withdraw"      value={fmt(tax.allowance_remaining)} highlight="positive" />
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">Top-Slicing Relief</p>
-        <TaxRow label="Years held"                 value={String(tax.years_held)} />
-        <TaxRow label="Top-sliced gain / year"     value={fmt(tax.top_sliced_gain)} sub />
-        <PlanningTip text={`Top-slicing divides the gain (£${surrenderToday.toLocaleString()}) by ${tax.years_held} years, giving £${tax.top_sliced_gain.toLocaleString()} per year. This may keep the gain within the basic-rate band and eliminate the higher-rate liability on surrender.`} />
+      <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#E2E8F0]">
+        <div className="md:pr-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Bond Summary</p>
+          <TaxRow label="Total premiums paid"    value={fmt(tax.total_premiums)} />
+          <TaxRow label="Current surrender value" value={fmt(tax.total_premiums + surrenderToday)} />
+          <Divider />
+          <TaxRow label="Chargeable event gain"  value={fmt(surrenderToday)} highlight="warning" />
+        </div>
+        <div className="pt-4 md:pt-0 md:px-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">5% Withdrawal Allowance</p>
+          <TaxRow label="Annual allowance (5% of premiums)" value={fmt(tax.annual_allowance_5pct) + " /yr"} />
+          <TaxRow label={`Cumulative (${tax.years_held} yrs)`} value={fmt(tax.cumulative_allowance)} sub />
+          <TaxRow label="Withdrawn to date"     value={fmt(tax.allowance_used)}     sub />
+          <TaxRow label="Available to withdraw" value={fmt(tax.allowance_remaining)} highlight="positive" />
+        </div>
+        <div className="pt-4 md:pt-0 md:pl-6">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Top-Slicing Relief</p>
+          <TaxRow label="Years held"             value={String(tax.years_held)} />
+          <TaxRow label="Top-sliced gain / year" value={fmt(tax.top_sliced_gain)} sub />
+          <PlanningTip text={`Top-slicing divides the gain (£${surrenderToday.toLocaleString()}) by ${tax.years_held} years, giving £${tax.top_sliced_gain.toLocaleString()} per year. This may keep the gain within the basic-rate band on surrender.`} />
+        </div>
       </div>
     </div>
   );
@@ -255,31 +280,32 @@ function SIPPPanel({ tax }: { tax: SIPPTaxDetails }) {
         <h3 className="text-sm font-semibold text-[#0F172A]">Pension Position</h3>
         <p className="text-xs text-slate-500 mt-0.5">2024/25 tax year</p>
       </div>
-      <div className="px-5 py-3">
-        <TaxRow label="Uncrystallised funds"       value={fmt(tax.uncrystallised)} />
-        <TaxRow label="In drawdown"                value={fmt(tax.drawdown)} sub />
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">Annual Allowance</p>
-        <TaxRow label="Allowance (2024/25)"        value={fmt(tax.annual_allowance)} />
-        <TaxRow label="Used this year"             value={fmt(tax.allowance_used)}      sub highlight={tax.allowance_used >= tax.annual_allowance ? "warning" : "neutral"} />
-        <TaxRow label="Remaining"                  value={fmt(tax.allowance_remaining)} sub highlight={tax.allowance_remaining > 0 ? "positive" : "warning"} />
-
-        <div className="mt-2 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
-          <div
-            className={cn("h-full rounded-full", tax.allowance_remaining === 0 ? "bg-amber-500" : "bg-amber-500")}
-            style={{ width: `${Math.min(100, (tax.allowance_used / tax.annual_allowance) * 100)}%` }}
-          />
+      <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#E2E8F0]">
+        <div className="md:pr-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Fund Summary</p>
+          <TaxRow label="Uncrystallised funds" value={fmt(tax.uncrystallised)} />
+          <TaxRow label="In drawdown"          value={fmt(tax.drawdown)} sub />
         </div>
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">Pension Commencement Lump Sum</p>
-        <TaxRow label="PCLS available (est.)"      value={fmt(tax.pcls_available)} highlight="positive" />
-        <TaxRow label={`Tax-free (${pcls_pct.toFixed(0)}% of uncrystallised)`} value="Tax-free cash" sub />
-        {tax.pcls_available === tax.pcls_max && (
-          <TaxRow label="Capped at standard PCLS limit" value="£268,275" sub highlight="warning" />
-        )}
-        {tax.allowance_remaining > 0 && (
-          <PlanningTip text={`£${tax.allowance_remaining.toLocaleString()} annual allowance remains this tax year. Additional contributions now attract income tax relief and grow sheltered inside the pension wrapper.`} />
-        )}
+        <div className="pt-4 md:pt-0 md:px-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Annual Allowance</p>
+          <TaxRow label="Allowance (2024/25)" value={fmt(tax.annual_allowance)} />
+          <TaxRow label="Used this year"      value={fmt(tax.allowance_used)}      sub highlight={tax.allowance_used >= tax.annual_allowance ? "warning" : "neutral"} />
+          <TaxRow label="Remaining"           value={fmt(tax.allowance_remaining)} sub highlight={tax.allowance_remaining > 0 ? "positive" : "warning"} />
+          <div className="mt-2 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, (tax.allowance_used / tax.annual_allowance) * 100)}%` }} />
+          </div>
+          {tax.allowance_remaining > 0 && (
+            <PlanningTip text={`£${tax.allowance_remaining.toLocaleString()} annual allowance remains. Additional contributions attract income tax relief and grow sheltered inside the pension.`} />
+          )}
+        </div>
+        <div className="pt-4 md:pt-0 md:pl-6">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Pension Commencement Lump Sum</p>
+          <TaxRow label="PCLS available (est.)" value={fmt(tax.pcls_available)} highlight="positive" />
+          <TaxRow label={`Tax-free (${pcls_pct.toFixed(0)}% of uncrystallised)`} value="Tax-free cash" sub />
+          {tax.pcls_available === tax.pcls_max && (
+            <TaxRow label="Capped at standard PCLS limit" value="£268,275" sub highlight="warning" />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -293,31 +319,34 @@ function ISAPanel({ tax }: { tax: ISATaxDetails }) {
         <h3 className="text-sm font-semibold text-[#0F172A]">ISA Position</h3>
         <p className="text-xs text-slate-500 mt-0.5">2024/25 tax year</p>
       </div>
-      <div className="px-5 py-3">
-        <TaxRow label="Total subscribed (lifetime)" value={fmt(tax.total_subscribed)} />
-        <TaxRow label="Tax-free growth"              value={"+" + fmt(tax.tax_free_growth)} highlight="positive" />
-        <Divider />
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1">2024/25 Subscription</p>
-        <TaxRow label="Subscribed this year"         value={fmt(tax.current_year_subscription)} />
-        <TaxRow label="Annual limit"                 value={fmt(tax.subscription_limit)} sub />
-        <TaxRow label="Remaining allowance"          value={fmt(tax.subscription_remaining)} highlight={tax.subscription_remaining > 0 ? "positive" : "neutral"} />
-        <div className="mt-2 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-emerald-500 rounded-full"
-            style={{ width: `${Math.min(100, usedPct)}%` }}
-          />
+      <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#E2E8F0]">
+        <div className="md:pr-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Lifetime Summary</p>
+          <TaxRow label="Total subscribed (lifetime)" value={fmt(tax.total_subscribed)} />
+          <TaxRow label="Tax-free growth"              value={"+" + fmt(tax.tax_free_growth)} highlight="positive" />
         </div>
-        <p className="text-xs text-slate-400 mt-1 text-right tabular-nums">{usedPct.toFixed(0)}% used</p>
-        <Divider />
-        <div className="flex items-start gap-2 mt-2 py-2">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-emerald-700 leading-relaxed">
-            All income and capital gains within this ISA are permanently free from UK Income Tax and CGT — on withdrawal as well as inside the wrapper.
-          </p>
+        <div className="pt-4 md:pt-0 md:px-6 pb-4 md:pb-0">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">2024/25 Subscription</p>
+          <TaxRow label="Subscribed this year" value={fmt(tax.current_year_subscription)} />
+          <TaxRow label="Annual limit"          value={fmt(tax.subscription_limit)} sub />
+          <TaxRow label="Remaining allowance"   value={fmt(tax.subscription_remaining)} highlight={tax.subscription_remaining > 0 ? "positive" : "neutral"} />
+          <div className="mt-2 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, usedPct)}%` }} />
+          </div>
+          <p className="text-xs text-slate-400 mt-1 text-right tabular-nums">{usedPct.toFixed(0)}% used</p>
         </div>
-        {tax.subscription_remaining > 0 && (
-          <PlanningTip text={`£${tax.subscription_remaining.toLocaleString()} ISA allowance remains this tax year. Consider topping up to shelter additional growth, particularly for holdings currently in the GIA where CGT may apply.`} />
-        )}
+        <div className="pt-4 md:pt-0 md:pl-6">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Tax Treatment</p>
+          <div className="flex items-start gap-2 py-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-emerald-700 leading-relaxed">
+              All income and capital gains within this ISA are permanently free from UK Income Tax and CGT — on withdrawal as well as inside the wrapper.
+            </p>
+          </div>
+          {tax.subscription_remaining > 0 && (
+            <PlanningTip text={`£${tax.subscription_remaining.toLocaleString()} ISA allowance remains this tax year. Consider topping up to shelter additional growth, particularly for holdings in the GIA where CGT may apply.`} />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -471,11 +500,11 @@ export default function WrapperDetail() {
           ))}
         </div>
 
-        {/* ── Holdings + Tax analysis ──────────────────────────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5">
-          <HoldingsTable holdings={wrapper.holdings} />
-          <TaxPanel tax={wrapper.tax} />
-        </div>
+        {/* ── Holdings ─────────────────────────────────────────────────────── */}
+        <HoldingsTable holdings={wrapper.holdings} />
+
+        {/* ── Tax analysis ─────────────────────────────────────────────────── */}
+        <TaxPanel tax={wrapper.tax} />
 
         {/* ── Bond Transaction Ledger (OFFSHORE_BOND only) ─────────────────── */}
         {isOffshoresBond && offTax && (

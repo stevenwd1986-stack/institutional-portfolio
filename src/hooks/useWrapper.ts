@@ -14,6 +14,7 @@ export interface HoldingDetail {
   market_value:    number;
   cost_basis:      number;
   unrealised_gain: number;
+  realised_gain:   number;
   pct_gain:        number;
 }
 
@@ -216,6 +217,7 @@ export function useWrapper(clientId: string, wrapperId: string) {
           market_value:    h.current_value ?? 0,
           cost_basis:      h.cost_basis ?? 0,
           unrealised_gain: gain,
+          realised_gain:   0,
           pct_gain:        (h.cost_basis ?? 0) > 0 ? gain / h.cost_basis : 0,
         };
       });

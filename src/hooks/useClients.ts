@@ -5,6 +5,8 @@ export interface ClientRow {
   id:             string;
   first_name:     string;
   last_name:      string;
+  adviser_id:     string;
+  adviser_name:   string;
   risk_profile:   string;
   total_aum:      number;
   sipp_value:     number;
@@ -50,21 +52,26 @@ export function useClients() {
 
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, risk_band, updated_at, accounts(account_type, current_value, is_active)")
+        .select("id, first_name, last_name, adviser_id, risk_band, updated_at, advisers(first_name, last_name), accounts(account_type, current_value, is_active)")
         .eq("is_active", true)
         .order("last_name");
 
       if (error) throw error;
 
-      return (data as any[]).map((c) => ({
-        id:             c.id,
-        first_name:     c.first_name,
-        last_name:      c.last_name,
-        risk_profile:   RISK_MAP[c.risk_band ?? ""] ?? "MEDIUM",
-        performance_1y: 0,
-        last_updated:   (c.updated_at as string).slice(0, 10),
-        ...aggregateAccounts(c.accounts ?? []),
-      }));
+      return (data as any[]).map((c): ClientRow => {
+        const adv = c.advisers as { first_name: string; last_name: string } | null;
+        return {
+          id:             c.id,
+          first_name:     c.first_name,
+          last_name:      c.last_name,
+          adviser_id:     c.adviser_id ?? "",
+          adviser_name:   adv ? `${adv.first_name} ${adv.last_name}` : "",
+          risk_profile:   RISK_MAP[c.risk_band ?? ""] ?? "MEDIUM",
+          performance_1y: 0,
+          last_updated:   (c.updated_at as string).slice(0, 10),
+          ...aggregateAccounts(c.accounts ?? []),
+        };
+      });
     },
     staleTime: 1000 * 60 * 5,
   });

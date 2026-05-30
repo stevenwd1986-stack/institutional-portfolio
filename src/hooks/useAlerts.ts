@@ -32,7 +32,7 @@ function cleanPortfolioName(name: string): string {
 
 async function checkStalePrices(now: string): Promise<AlertItem[]> {
   // Holdings whose price hasn't been updated in more than 5 business days
-  const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const cutoff = new Date(new Date(now).getTime() - 7 * 86_400_000).toISOString();
 
   const { data } = await supabase
     .from("holdings")

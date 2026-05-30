@@ -1,76 +1,301 @@
-import { useQuery } from "@tanstack/react-query";
-import { FileText }  from "lucide-react";
+import { FileText } from "lucide-react";
 
-const BRANDFETCH_KEY = import.meta.env.VITE_BRANDFETCH_API_KEY as string | undefined;
+function faviconUrl(domain: string): string {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+}
 
 // ── Platform → domain ─────────────────────────────────────────────────────────
 
 const PLATFORM_DOMAINS: Record<string, string> = {
-  TRANSACT:           "transact.co.uk",
-  FINIO:              "finio.co.uk",
-  NOVIA:              "novia.co.uk",
-  QUILTER:            "quilter.com",
-  RL360:              "rl360.com",
-  "CANADA LIFE":      "canadalife.co.uk",
-  "STANDARD LIFE":    "standardlife.co.uk",
-  "CHARLES STANLEY":  "charlesstanley.co.uk",
-  "HARGREAVES LANSDOWN": "hl.co.uk",
-  "AJ BELL":          "ajbell.co.uk",
-  "JAMES HAY":        "jameshay.co.uk",
-  AVIVA:              "aviva.co.uk",
-  ABRDN:              "abrdn.com",
-  NUCLEUS:            "nucleusfinancial.com",
-  AEGON:              "aegon.co.uk",
-  ZURICH:             "zurich.co.uk",
-  "OLD MUTUAL":       "oldmutualwealth.co.uk",
-  CAVENDISH:          "cavendishonline.co.uk",
-  ALLIANCE:           "alliancetrust.co.uk",
+  // ── Wrap / adviser platforms ────────────────────────────────────────────────
+  TRANSACT:                  "transact.co.uk",
+  FINIO:                     "finio.co.uk",
+  NUCLEUS:                   "nucleusfinancial.com",
+  NOVIA:                     "novia.co.uk",
+  QUILTER:                   "quilter.com",
+  PRAEMIUM:                  "praemium.com",
+  RAYMOND_JAMES:             "raymondjames.co.uk",
+  "RAYMOND JAMES":           "raymondjames.co.uk",
+  PARMENION:                 "parmenion.co.uk",
+  TATTON:                    "tattonam.com",
+  "7IM":                     "7im.co.uk",
+  COPIA:                     "copiacapital.co.uk",
+  WEALTHTIME:                "wealthtime.co.uk",
+  SANLAM:                    "sanlam.co.uk",
+  ALLIANCE:                  "alliancetrust.co.uk",
+  ABRDN:                     "abrdn.com",
+
+  // ── D2C / execution-only platforms ─────────────────────────────────────────
+  "HARGREAVES LANSDOWN":     "hl.co.uk",
+  HL:                        "hl.co.uk",
+  "AJ BELL":                 "ajbell.co.uk",
+  AJBELL:                    "ajbell.co.uk",
+  "INTERACTIVE INVESTOR":    "ii.co.uk",
+  II:                        "ii.co.uk",
+  VANGUARD:                  "vanguard.co.uk",
+  FIDELITY:                  "fidelity.co.uk",
+  "FIDELITY ADVISER":        "fidelity.co.uk",
+  BESTINVEST:                "bestinvest.co.uk",
+  "CHARLES STANLEY":         "charlesstanley.co.uk",
+  "CHARLES STANLEY DIRECT":  "charlesstanley.co.uk",
+  CAVENDISH:                 "cavendishonline.co.uk",
+  IWEB:                      "iweb-sharedealing.co.uk",
+  SHARE:                     "share.com",
+  FREETRADE:                 "freetrade.io",
+  TRADING212:                "trading212.com",
+  "TRADING 212":             "trading212.com",
+  ETORO:                     "etoro.com",
+
+  // ── SIPP / SSAS specialists ─────────────────────────────────────────────────
+  "JAMES HAY":               "jameshay.co.uk",
+  SIPPDEAL:                  "sippdeal.co.uk",
+  "BARNETT WADDINGHAM":      "barnettwaddingham.co.uk",
+  TALBOT:                    "talbotandmuir.co.uk",
+  "TALBOT & MUIR":           "talbotandmuir.co.uk",
+  DENTONS:                   "dentonspensiontrust.co.uk",
+  "A J BELL SIPP":           "ajbell.co.uk",
+  "SUFFOLK LIFE":            "suffolklife.co.uk",
+  "ROWANMOOR":               "rowanmoor.co.uk",
+  "XAFINITY":                "xafinity.com",
+  HORNBUCKLE:                "hornbuckle.co.uk",
+
+  // ── Life & pension insurers ─────────────────────────────────────────────────
+  AVIVA:                     "aviva.co.uk",
+  "LEGAL & GENERAL":         "legalandgeneral.com",
+  "L&G":                     "legalandgeneral.com",
+  "STANDARD LIFE":           "standardlife.co.uk",
+  "SCOTTISH WIDOWS":         "scottishwidows.co.uk",
+  REASSURE:                  "reassure.co.uk",
+  PHOENIX:                   "phoenixgroup.com",
+  "PHOENIX GROUP":           "phoenixgroup.com",
+  "ROYAL LONDON":            "royallondon.com",
+  AEGON:                     "aegon.co.uk",
+  ZURICH:                    "zurich.co.uk",
+  "CANADA LIFE":             "canadalife.co.uk",
+  RL360:                     "rl360.com",
+  "OLD MUTUAL":              "oldmutualwealth.co.uk",
+  "OLD MUTUAL WEALTH":       "oldmutualwealth.co.uk",
+  "UTMOST":                  "utmostinternational.com",
+  "UTMOST INTERNATIONAL":    "utmostinternational.com",
+  VITALITY:                  "vitality.co.uk",
+  "VITALITY INVEST":         "vitality.co.uk",
+  "LV=":                     "lv.com",
+  LV:                        "lv.com",
+  "LIVERPOOL VICTORIA":      "lv.com",
+  "SUN LIFE":                "sunlife.co.uk",
+  "SUN LIFE FINANCIAL":      "sunlife.co.uk",
+  METLIFE:                   "metlife.co.uk",
+  "CLERICAL MEDICAL":        "clericalmedical.co.uk",
+  ZURICHLIFE:                "zurich.co.uk",
+  "FRIENDS LIFE":            "aviva.co.uk",
+  "FRIENDS PROVIDENT":       "aviva.co.uk",
+  "GUARDIAN FINANCIAL":      "guardianfinancial.co.uk",
+  GUARDIAN:                  "guardianfinancial.co.uk",
+  ONELIFE:                   "onelife.co.uk",
+  "SCOTTISH EQUITABLE":      "aegon.co.uk",
+  "SCOTTISH LIFE":           "royallondon.com",
+  "PRUDENTIAL":              "prudential.co.uk",
+  PRU:                       "prudential.co.uk",
+  NFU:                       "nfumutual.co.uk",
+  "NFU MUTUAL":              "nfumutual.co.uk",
+  "WESLEYAN":                "wesleyan.co.uk",
+  "NATIONAL FRIENDLY":       "nationalfriendly.co.uk",
+
+  // ── Workplace / master trust providers ─────────────────────────────────────
+  NEST:                      "nestpensions.org.uk",
+  "PEOPLES PENSION":         "thepeoplespension.co.uk",
+  "THE PEOPLES PENSION":     "thepeoplespension.co.uk",
+  "NOW PENSIONS":            "nowpensions.com",
+  "NOW:PENSIONS":            "nowpensions.com",
+  SMART:                     "smartpension.co.uk",
+  "SMART PENSION":           "smartpension.co.uk",
+  "CUSHON":                  "cushon.co.uk",
+  SALVUS:                    "salvusmastertrustpension.co.uk",
+  "ATLAS MASTER TRUST":      "atlasmastertrust.co.uk",
+
+  // ── Offshore / international bonds ─────────────────────────────────────────
+  "HANSARD":                 "hansard.com",
+  GENERALI:                  "generali.com",
+  "CLERICAL MEDICAL INT":    "clericalmedical.co.uk",
+  "ZURICH INTERNATIONAL":    "zurichinternational.com",
+  "CANADA LIFE INTERNATIONAL": "canadalifeinternational.com",
+  "SCOTTISH WIDOWS INTERNATIONAL": "scottishwidows.co.uk",
+
+  // ── Discretionary fund managers ────────────────────────────────────────────
+  QUILTERCHEVIOT:            "quiltercheviot.com",
+  "QUILTER CHEVIOT":         "quiltercheviot.com",
+  "BREWIN DOLPHIN":          "brewin.co.uk",
+  "EVELYN PARTNERS":         "evelynpartners.com",
+  "SMITH & WILLIAMSON":      "evelynpartners.com",
+  RATHBONES:                 "rathbones.com",
+  "CHARLES STANLEY DFM":     "charlesstanley.co.uk",
+  CAZENOVE:                  "cazenovecapital.com",
+  "CAZENOVE CAPITAL":        "cazenovecapital.com",
+  "INVESTEC":                "investec.com",
+  CANACCORD:                 "canaccord.com",
+  "CANACCORD GENUITY":       "canaccord.com",
+  "JM FINN":                 "jmfinn.com",
+  SARASIN:                   "sarasinandpartners.com",
+  "SARASIN & PARTNERS":      "sarasinandpartners.com",
+  PSIGMA:                    "psigma.com",
+  "P1 INVESTMENT":           "p1investmentmanagement.co.uk",
 };
 
 // ── Fund manager → domain (matched against the start of instrument name) ──────
 
 // Ordered longest-first so "Baillie Gifford" matches before "Bail"
 const FUND_MANAGER_PREFIXES: [string, string][] = [
-  ["baillie gifford",           "bailliegifford.com"],
-  ["janus henderson",           "janushenderson.com"],
-  ["columbia threadneedle",     "columbiathreadneedle.co.uk"],
-  ["legal & general",           "legalandgeneral.com"],
-  ["premier miton",             "premiermiton.com"],
-  ["polar capital",             "polarcapital.co.uk"],
-  ["royal london",              "royallondon.com"],
-  ["standard life",             "standardlife.co.uk"],
-  ["charles stanley",           "charlesstanley.co.uk"],
-  ["dimensional",               "dimensional.com"],
-  ["blackrock",                 "blackrock.com"],
-  ["ishares",                   "ishares.com"],
-  ["vanguard",                  "vanguard.co.uk"],
-  ["fidelity",                  "fidelity.co.uk"],
-  ["fundsmith",                 "fundsmith.co.uk"],
-  ["artemis",                   "artemisfunds.com"],
-  ["schroders",                 "schroders.com"],
-  ["invesco",                   "invesco.com"],
-  ["rathbone",                  "rathbones.com"],
-  ["jupiter",                   "jupiteram.com"],
-  ["liontrust",                 "liontrust.co.uk"],
-  ["spdr",                      "ssga.com"],
-  ["m&g",                       "mandg.com"],
-  ["hsbc",                      "hsbc.co.uk"],
-  ["aberdeen",                  "abrdn.com"],
-  ["abrdn",                     "abrdn.com"],
-  ["aviva",                     "aviva.co.uk"],
-  ["l&g",                       "legalandgeneral.com"],
-  ["rl360",                     "rl360.com"],
-  ["cazenove",                  "cazenovecapital.com"],
-  ["ninety one",                "ninetyone.com"],
-  ["man group",                 "man.com"],
-  ["lazard",                    "lazard.com"],
-  ["threadneedle",              "columbiathreadneedle.co.uk"],
-  ["veritas",                   "veritasam.com"],
-  ["troy",                      "troyassetmanagement.com"],
-  ["cgwm",                      "canaccord.com"],
-  ["canaccord",                 "canaccord.com"],
-  ["evelyn partners",           "evelynpartners.com"],
-  ["smith & williamson",        "evelyn.com"],
+  // ── UK active managers ────────────────────────────────────────────────────
+  ["baillie gifford",                "bailliegifford.com"],
+  ["janus henderson",                "janushenderson.com"],
+  ["columbia threadneedle",          "columbiathreadneedle.co.uk"],
+  ["legal & general",                "legalandgeneral.com"],
+  ["premier miton",                  "premiermiton.com"],
+  ["polar capital",                  "polarcapital.co.uk"],
+  ["royal london",                   "royallondon.com"],
+  ["standard life",                  "standardlife.co.uk"],
+  ["charles stanley",                "charlesstanley.co.uk"],
+  ["evelyn partners",                "evelynpartners.com"],
+  ["smith & williamson",             "evelynpartners.com"],
+  ["close brothers asset",           "closebrothersam.com"],
+  ["close brothers",                 "closebrothersam.com"],
+  ["aegon asset management",         "aegon.co.uk"],
+  ["kames capital",                  "aegon.co.uk"],
+  ["quilter investors",              "quilter.com"],
+  ["old mutual global",              "quilter.com"],
+  ["twenty four",                    "twentyfourassetmanagement.com"],
+  ["twentyfour",                     "twentyfourassetmanagement.com"],
+  ["findlay park",                   "findlaypark.com"],
+  ["church house",                   "churchhouseinvest.com"],
+  ["aspect capital",                 "aspectcapital.com"],
+  ["colchester global",              "colchesterglobal.com"],
+  ["ninety one",                     "ninetyone.com"],
+  ["man group",                      "man.com"],
+  ["man glg",                        "man.com"],
+  ["man numeric",                    "man.com"],
+  ["rbc bluebay",                    "bluebay.com"],
+  ["insight investment",             "insightinvestment.com"],
+  ["bny mellon investment",          "bnymellon.com"],
+  ["newton investment",              "newtonim.com"],
+  ["cazenove",                       "cazenovecapital.com"],
+  ["lazard",                         "lazard.com"],
+  ["threadneedle",                   "columbiathreadneedle.co.uk"],
+  ["veritas",                        "veritasam.com"],
+  ["troy",                           "troyassetmanagement.com"],
+  ["cgwm",                           "canaccord.com"],
+  ["canaccord",                      "canaccord.com"],
+  ["ruffer",                         "ruffer.co.uk"],
+  ["evenlode",                       "evenlodeinvestment.com"],
+  ["marlborough",                    "marlboroughfunds.com"],
+  ["montanaro",                      "montanaro.co.uk"],
+  ["waverton",                       "waverton.co.uk"],
+  ["impax",                          "impaxam.com"],
+  ["sanditon",                       "sanditon-am.com"],
+  ["foresight",                      "foresightgroup.co.uk"],
+  ["psigma",                         "psigma.com"],
+  ["tatton",                         "tattonam.com"],
+  ["majedie",                        "majedie.com"],
+  ["thesis",                         "taml.co.uk"],
+  ["henderson",                      "janushenderson.com"],
+  ["sarasin",                        "sarasinandpartners.com"],
+  ["rathbone",                       "rathbones.com"],
+  ["colchester",                     "colchesterglobal.com"],
+  ["wesleyan",                       "wesleyan.co.uk"],
+  ["liontrust",                      "liontrust.co.uk"],
+  ["artemis",                        "artemisfunds.com"],
+  ["fundsmith",                      "fundsmith.co.uk"],
+  ["jupiter",                        "jupiteram.com"],
+
+  // ── Passive / index / ETF providers ──────────────────────────────────────
+  ["dimensional",                    "dimensional.com"],
+  ["blackrock",                      "blackrock.com"],
+  ["ishares",                        "ishares.com"],
+  ["vanguard",                       "vanguard.co.uk"],
+  ["spdr",                           "ssga.com"],
+  ["state street",                   "ssga.com"],
+  ["xtrackers",                      "dws.com"],
+  ["lyxor",                          "amundi.com"],
+  ["wisdomtree",                     "wisdomtree.com"],
+  ["wisdom tree",                    "wisdomtree.com"],
+  ["vaneck",                         "vaneck.com"],
+  ["van eck",                        "vaneck.com"],
+  ["hanetf",                         "hanetf.com"],
+  ["ossiam",                         "ossiam.com"],
+  ["tabula",                         "tabulainvestment.com"],
+  ["graniteshares",                  "graniteshares.com"],
+  ["leverage shares",                "leverageshares.com"],
+  ["global x",                       "globalxetfs.eu"],
+  ["rize",                           "rize-etf.com"],
+
+  // ── Global asset managers ─────────────────────────────────────────────────
+  ["allianz global investors",       "allianzgi.com"],
+  ["bnp paribas asset management",   "bnpparibas-am.com"],
+  ["jpmorgan asset management",      "jpmorgan.com"],
+  ["jp morgan asset management",     "jpmorgan.com"],
+  ["morgan stanley investment",      "morganstanley.com"],
+  ["goldman sachs asset",            "goldmansachs.com"],
+  ["franklin templeton",             "franklintempleton.com"],
+  ["federated hermes",               "federatedhermes.com"],
+  ["first sentier investors",        "firstsentier.com"],
+  ["first state investments",        "firstsentier.com"],
+  ["first sentier",                  "firstsentier.com"],
+  ["first state",                    "firstsentier.com"],
+  ["neuberger berman",               "nb.com"],
+  ["loomis sayles",                  "loomissayles.com"],
+  ["capital group",                  "capitalgroup.com"],
+  ["t. rowe price",                  "troweprice.com"],
+  ["t rowe price",                   "troweprice.com"],
+  ["walter scott",                   "walter-scott.co.uk"],
+  ["william blair",                  "williamblair.com"],
+  ["fidelity",                       "fidelity.co.uk"],
+  ["schroders",                      "schroders.com"],
+  ["invesco",                        "invesco.com"],
+  ["m&g",                            "mandg.com"],
+  ["hsbc",                           "hsbc.co.uk"],
+  ["aberdeen",                       "abrdn.com"],
+  ["abrdn",                          "abrdn.com"],
+  ["aviva",                          "aviva.co.uk"],
+  ["l&g",                            "legalandgeneral.com"],
+  ["rl360",                          "rl360.com"],
+  ["templeton",                      "franklintempleton.com"],
+  ["jpmorgan",                       "jpmorgan.com"],
+  ["jp morgan",                      "jpmorgan.com"],
+  ["jpm",                            "jpmorgan.com"],
+  ["morgan stanley",                 "morganstanley.com"],
+  ["goldman sachs",                  "goldmansachs.com"],
+  ["bnp paribas",                    "bnpparibas-am.com"],
+  ["carmignac",                      "carmignac.com"],
+  ["bluebay",                        "bluebay.com"],
+  ["pictet",                         "pictet.com"],
+  ["robeco",                         "robeco.com"],
+  ["comgest",                        "comgest.com"],
+  ["natixis",                        "im.natixis.com"],
+  ["mirova",                         "mirova.com"],
+  ["nordea",                         "nordea.com"],
+  ["amundi",                         "amundi.com"],
+  ["barings",                        "barings.com"],
+  ["nuveen",                         "nuveen.com"],
+  ["pimco",                          "pimco.com"],
+  ["pgim",                           "pgim.com"],
+  ["orbis",                          "orbis.com"],
+  ["hermes",                         "federatedhermes.com"],
+  ["winton",                         "winton.com"],
+  ["blackstone",                     "blackstone.com"],
+  ["vontobel",                       "vontobel.com"],
+  ["skagen",                         "skagenfunds.com"],
+  ["eastspring",                     "eastspring.com"],
+  ["alquity",                        "alquity.com"],
+  ["gam",                            "gam.com"],
+  ["ubs",                            "ubs.com"],
+  ["dws",                            "dws.com"],
+
+  // ── Infrastructure / alternatives ─────────────────────────────────────────
+  ["greencoat",                      "greencoat.com"],
+  ["hicl",                           "hicl.com"],
+  ["3i infrastructure",              "3i.com"],
+  ["3i",                             "3i.com"],
+  ["bbgi",                           "bbgi.com"],
+  ["sequoia economic",               "sequoia.fund"],
 ];
 
 export function getFundManagerDomain(instrumentName: string): string | null {
@@ -83,50 +308,11 @@ export function getFundManagerDomain(instrumentName: string): string | null {
   return null;
 }
 
-// ── Shared Brandfetch fetch + cache ───────────────────────────────────────────
-
-const logoUrlCache = new Map<string, string | null>();
-
-async function fetchBrandfetchLogo(domain: string): Promise<string | null> {
-  if (logoUrlCache.has(domain)) return logoUrlCache.get(domain)!;
-  if (!BRANDFETCH_KEY) return null;
-
-  try {
-    const res = await fetch(`https://api.brandfetch.io/v2/brands/${domain}`, {
-      headers: { Authorization: `Bearer ${BRANDFETCH_KEY}` },
-    });
-    if (!res.ok) { logoUrlCache.set(domain, null); return null; }
-
-    const json = await res.json();
-    const logos: any[] = json.logos ?? [];
-
-    const target = logos.find((l) => l.type === "icon") ?? logos[0];
-    if (!target) { logoUrlCache.set(domain, null); return null; }
-
-    const formats: any[] = target.formats ?? [];
-    const src =
-      (formats.find((f) => f.format === "svg") ??
-       formats.find((f) => f.format === "png") ??
-       formats[0])?.src ?? null;
-
-    logoUrlCache.set(domain, src);
-    return src;
-  } catch {
-    logoUrlCache.set(domain, null);
-    return null;
-  }
-}
-
 // ── PlatformLogo ──────────────────────────────────────────────────────────────
 
-export function usePlatformLogo(platform: string) {
+export function usePlatformLogo(platform: string): { data: string | null } {
   const domain = PLATFORM_DOMAINS[platform.toUpperCase()];
-  return useQuery({
-    queryKey:  ["platform-logo", domain ?? platform],
-    queryFn:   () => (domain ? fetchBrandfetchLogo(domain) : Promise.resolve(null)),
-    staleTime: 1000 * 60 * 60 * 24,
-    enabled:   Boolean(domain),
-  });
+  return { data: domain ? faviconUrl(domain) : null };
 }
 
 interface PlatformLogoProps {
@@ -176,14 +362,9 @@ function stringToColor(str: string): string {
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
-export function useFundManagerLogo(instrumentName: string) {
+export function useFundManagerLogo(instrumentName: string): { data: string | null } {
   const domain = getFundManagerDomain(instrumentName);
-  return useQuery({
-    queryKey:  ["fund-logo", domain ?? instrumentName],
-    queryFn:   () => (domain ? fetchBrandfetchLogo(domain) : Promise.resolve(null)),
-    staleTime: 1000 * 60 * 60 * 24,
-    enabled:   Boolean(domain),
-  });
+  return { data: domain ? faviconUrl(domain) : null };
 }
 
 interface FundManagerLogoProps {
