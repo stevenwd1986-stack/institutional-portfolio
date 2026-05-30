@@ -14,7 +14,7 @@ ALTER TABLE public.instruments
 -- You can refine per-instrument after if needed.
 UPDATE public.instruments
 SET quote_currency = 'GBX', price_scale = 100
-WHERE exchange = 'LSE'
+WHERE eodhd_code LIKE '%.LSE'
   AND quote_currency = 'GBP';
 
 -- ─── 2. Price history table ────────────────────────────────────────────────────
