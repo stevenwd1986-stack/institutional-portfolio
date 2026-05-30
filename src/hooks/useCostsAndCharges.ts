@@ -134,7 +134,7 @@ export function useCostsBreakdown() {
 
         // ── holding ──
         const marketVal  = n(raw.market_value_gbp);
-        const costBasis  = n(raw.net_cost_gbp);
+        const costBasis  = n(raw.units) * n(raw.avg_cost_basis);
         const usesCost   = marketVal <= 0 && costBasis > 0;
         const value      = marketVal > 0 ? marketVal : costBasis;
         const ocfPct     = nullable(raw.ocf_pct);
@@ -145,7 +145,7 @@ export function useCostsBreakdown() {
           isin:            raw.isin ?? null,
           instrument_type: raw.instrument_type ?? "",
           ocf_pct:         ocfPct,
-          net_quantity:    n(raw.net_quantity),
+          net_quantity:    n(raw.units),
           value,
           using_cost_basis: usesCost,
           annual_ocf_cost:  ocfPct != null ? value * (ocfPct / 100) : 0,
@@ -221,7 +221,7 @@ export function useUpdateAccountFees() {
   return useMutation({
     mutationFn: async ({ accountId, platform_pct, adviser_pct, dim_pct }: UpdateFeesParams) => {
       const { error } = await supabase
-        .from("accounts")
+        .from("tax_wrappers")
         .update({
           scheme_amc_pct:     platform_pct,
           adviser_charge_pct: adviser_pct,
