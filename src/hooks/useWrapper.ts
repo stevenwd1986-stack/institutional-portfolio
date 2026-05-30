@@ -225,96 +225,56 @@ export function useWrapper(clientId: string, wrapperId: string) {
       const value     = data.current_value ?? 0;
       const costBasis = holdings.reduce((s, h) => s + h.cost_basis, 0);
 
-      const today       = new Date();
-      const oneYearAgo  = new Date(today);
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
+      const today = new Date();
 
-      const [{ data: allVals }, { data: yearVals }, { data: txns }, tax] = await Promise.all([
-        supabase
-          .from("valuations")
-          .select("valuation_date, market_value")
-          .eq("tax_wrapper_id", wrapperId)
-          .order("valuation_date"),
-        supabase
-          .from("valuations")
-          .select("valuation_date, market_value")
-          .eq("tax_wrapper_id", wrapperId)
-          .gte("valuation_date", oneYearAgoStr)
-          .order("valuation_date"),
+      const [{ data: txns }, tax] = await Promise.all([
         supabase
           .from("transactions")
-          .select("trade_date, net_amount, is_book_over, transaction_type, sub_accounts!inner(tax_wrapper_id)")
-          .eq("sub_accounts.tax_wrapper_id", wrapperId)
-          .order("trade_date"),
+          .select("settled_at, amount, transaction_type")
+          .eq("account_id", wrapperId)
+          .order("settled_at"),
         buildTax(wrapperType, clientId, wrapperId, value, costBasis, holdings),
       ]);
 
-      const INFLOW_TYPES = ["CONTRIBUTION", "TRANSFER_IN_CASH", "BUY"];
-
-      const allValPoints = (allVals ?? []).map((v) => ({
-        date:  new Date(v.valuation_date),
-        value: Number(v.market_value),
-      }));
-
-      const yearValPoints = (yearVals ?? []).map((v) => ({
-        date:  new Date(v.valuation_date),
-        value: Number(v.market_value),
-      }));
-
-      const cfEvents = (txns ?? []).map((t: any) => ({
-        date:         new Date(t.trade_date),
-        amount:       INFLOW_TYPES.includes(t.transaction_type)
-                        ? -Number(t.net_amount)
-                        : Number(t.net_amount),
-        is_book_over: Boolean(t.is_book_over),
-      }));
+      const INFLOW_TYPES = ["buy", "contribution", "transfer_in"];
 
       let twr            = 0;
       let performance_1y = 0;
       let xirr           = 0;
       let cagr           = 0;
 
-      // TWR — all-time
-      if (allValPoints.length >= 2) {
-        const result = calculateTWR(allValPoints, cfEvents, allValPoints[0].date, today);
-        if (result !== null) twr = result;
-      }
-
-      // 1Y Return — TWR over last 12 months
-      if (yearValPoints.length >= 2) {
-        const yearCFs = cfEvents.filter((cf) => cf.date >= oneYearAgo);
-        const result  = calculateTWR(yearValPoints, yearCFs, oneYearAgo, today);
-        if (result !== null) performance_1y = result;
-      }
-
-      // XIRR — aggregate cash flows + terminal value
+      // XIRR — cash flows from transactions + terminal value (current portfolio value)
       const xirrCFs: { date: Date; amount: number }[] = (txns ?? [])
-        .filter((t: any) => !t.is_book_over)
+        .filter((t: any) => t.settled_at && Number(t.amount) !== 0)
         .map((t: any) => ({
-          date:   new Date(t.trade_date),
+          date:   new Date(t.settled_at),
           amount: INFLOW_TYPES.includes(t.transaction_type)
-                    ? -Number(t.net_amount)
-                    : Number(t.net_amount),
+                    ? -Number(t.amount)
+                    : Number(t.amount),
         }));
-      if (allValPoints.length > 0) {
-        xirrCFs.push({ date: today, amount: allValPoints.at(-1)!.value });
+      if (value > 0) {
+        xirrCFs.push({ date: today, amount: value });
       }
       if (xirrCFs.length >= 2) {
         const result = calculateXIRR(xirrCFs);
         if (result !== null) xirr = result;
       }
 
-      // CAGR — from first valuation to today
-      if (allValPoints.length >= 2) {
+      // CAGR — from earliest transaction to today using cost basis → current value
+      const firstTxn = txns?.[0];
+      if (firstTxn && costBasis > 0 && value > 0) {
         const result = calculateCAGR({
-          initialValue: allValPoints[0].value,
-          finalValue:   allValPoints.at(-1)!.value,
-          startDate:    allValPoints[0].date,
+          initialValue: costBasis,
+          finalValue:   value,
+          startDate:    new Date(firstTxn.settled_at),
           endDate:      today,
         });
         if (result !== null) cagr = result;
       }
+
+      // TWR and 1Y return require historical valuation snapshots — not available yet
+      twr            = cagr;
+      performance_1y = cagr;
 
       return {
         id:             data.id,
