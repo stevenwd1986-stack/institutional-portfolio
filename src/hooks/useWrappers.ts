@@ -24,17 +24,17 @@ export interface WrapperSummary {
   sub_accounts:        SubAccountSummary[];
 }
 
-// account_type enum values from Supabase → display wrapper type
 const WRAPPER_TYPE_MAP: Record<string, WrapperSummary["wrapper_type"]> = {
-  isa:              "ISA",
-  lisa:             "LISA",
-  jisa:             "JISA",
-  sipp:             "SIPP",
-  sipp_drawdown:    "SIPP",
-  workplace_pension:"SIPP",
-  offshore_bond:    "OFFSHORE_BOND",
-  gia:              "GIA",
-  other:            "GIA",
+  isa_ss:          "ISA",
+  isa_cash:        "ISA",
+  lisa:            "LISA",
+  jisa:            "JISA",
+  sipp:            "SIPP",
+  sipp_drawdown:   "SIPP",
+  dc_workplace:    "SIPP",
+  db_workplace:    "SIPP",
+  gia:             "GIA",
+  investment_bond: "OFFSHORE_BOND",
 };
 
 export function useWrappers(clientId: string) {
@@ -45,23 +45,32 @@ export function useWrappers(clientId: string) {
 
       const { data, error } = await supabase
         .from("accounts")
-        .select("id, account_type, provider_name, status")
-        .eq("portfolio_id", clientId)
-        .order("created_at");
+        .select(`
+          id, account_type, provider, current_value, is_active, closed_at, annual_contribution,
+          holdings(cost_basis)
+        `)
+        .eq("client_id", clientId)
+        .order("is_active", { ascending: false });
 
       if (error) throw error;
 
-      return (data as any[]).map((a) => ({
-        id:                  a.id,
-        wrapper_type:        WRAPPER_TYPE_MAP[a.account_type] ?? "GIA",
-        platform:            a.provider_name ?? "Unknown",
-        value:               0,
-        cost_basis:          0,
-        performance_1y:      0,
-        contributions_total: 0,
-        is_closed:           a.status !== "active",
-        sub_accounts:        [],
-      } satisfies WrapperSummary));
+      return (data as any[]).map((a) => {
+        const costBasis = (a.holdings as any[])
+          .reduce((s: number, h: any) => s + (h.cost_basis ?? 0), 0);
+
+        return {
+          id:                  a.id,
+          wrapper_type:        WRAPPER_TYPE_MAP[a.account_type] ?? "GIA",
+          platform:            a.provider ?? "Unknown",
+          value:               a.current_value ?? 0,
+          cost_basis:          costBasis,
+          performance_1y:      0,
+          contributions_total: a.annual_contribution ?? 0,
+          is_closed:           !a.is_active,
+          closed_date:         a.closed_at ?? undefined,
+          sub_accounts:        [],
+        } satisfies WrapperSummary;
+      });
     },
     staleTime: 1000 * 60 * 5,
   });

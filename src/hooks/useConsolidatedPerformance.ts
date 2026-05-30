@@ -67,7 +67,7 @@ function computeMetrics(
   allVals:   { date: Date; value: number }[],
   allCFs:    { date: Date; amount: number; is_book_over: boolean }[],
   years:     number,
-  periodKey: ReturnPeriod,
+  _periodKey: ReturnPeriod,
 ): PeriodMetrics {
   const pStart = periodStartDate(years);
   const pEnd   = new Date();

@@ -11,18 +11,13 @@ export interface ClientDetail {
   lastReviewDate: string | null;
 }
 
-// Split a portfolio/household name like "stevenwood's Portfolio" into first/last
-function splitName(name: string): { firstName: string; lastName: string } {
-  // Strip possessive suffix and "Portfolio"/"Household"
-  const cleaned = name
-    .replace(/'s\s+(Portfolio|Household)$/i, "")
-    .trim();
-  const parts = cleaned.split(/\s+/);
-  return {
-    firstName: parts[0] ?? cleaned,
-    lastName:  parts.slice(1).join(" ") || "",
-  };
-}
+const RISK_MAP: Record<string, string> = {
+  cautious:               "LOW",
+  moderately_cautious:    "MEDIUM_LOW",
+  balanced:               "MEDIUM",
+  moderately_adventurous: "MEDIUM_HIGH",
+  adventurous:            "HIGH",
+};
 
 export function useClient(clientId: string) {
   return useQuery<ClientDetail>({
@@ -30,25 +25,35 @@ export function useClient(clientId: string) {
     queryFn: async () => {
       if (!isSupabaseConfigured) throw new Error("Supabase not configured");
 
-      // clientId = portfolio.id
       const { data, error } = await supabase
-        .from("portfolios")
-        .select("id, name, updated_at")
+        .from("clients")
+        .select(`
+          id, first_name, last_name, risk_band, last_review_date,
+          advisers(first_name, last_name),
+          accounts(current_value, is_active)
+        `)
         .eq("id", clientId)
         .single();
 
       if (error) throw error;
 
-      const { firstName, lastName } = splitName(data.name as string);
+      const adviser = data.advisers as any;
+      const adviserName = adviser
+        ? `${adviser.first_name} ${adviser.last_name}`
+        : "Adviser";
+
+      const totalAUM = (data.accounts as any[])
+        .filter((a: any) => a.is_active)
+        .reduce((s: number, a: any) => s + (a.current_value ?? 0), 0);
 
       return {
         id:             data.id,
-        firstName,
-        lastName,
-        adviserName:    "Adviser",
-        riskProfile:    "MEDIUM",
-        totalAUM:       0,
-        lastReviewDate: null,
+        firstName:      data.first_name,
+        lastName:       data.last_name,
+        adviserName,
+        riskProfile:    RISK_MAP[data.risk_band ?? ""] ?? "MEDIUM",
+        totalAUM,
+        lastReviewDate: data.last_review_date,
       };
     },
     staleTime: 1000 * 60 * 5,
