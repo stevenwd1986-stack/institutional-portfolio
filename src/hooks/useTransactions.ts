@@ -4,12 +4,26 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type TxType =
-  | "CASH_IN" | "CASH_OUT" | "IN_SPECIE_IN" | "IN_SPECIE_OUT"
-  | "WITHDRAWAL" | "TAX_RELIEF" | "FEE" | "DIVIDEND" | "INTEREST"
-  | "BUY" | "SELL" | "CONTRIBUTION" | "TRANSFER_IN_SPECIE"
-  | "TRANSFER_OUT_SPECIE" | "TRANSFER_IN_CASH" | "TRANSFER_OUT_CASH"
-  | "BENEFIT_CRYSTALLISATION" | "CORPORATE_ACTION_SPLIT"
-  | "CORPORATE_ACTION_MERGE" | "TAX";
+  | "CASH_IN"
+  | "CASH_OUT"
+  | "IN_SPECIE_IN"
+  | "IN_SPECIE_OUT"
+  | "WITHDRAWAL"
+  | "TAX_RELIEF"
+  | "FEE"
+  | "DIVIDEND"
+  | "INTEREST"
+  | "BUY"
+  | "SELL"
+  | "CONTRIBUTION"
+  | "TRANSFER_IN_SPECIE"
+  | "TRANSFER_OUT_SPECIE"
+  | "TRANSFER_IN_CASH"
+  | "TRANSFER_OUT_CASH"
+  | "BENEFIT_CRYSTALLISATION"
+  | "CORPORATE_ACTION_SPLIT"
+  | "CORPORATE_ACTION_MERGE"
+  | "TAX";
 
 export interface TransactionRow {
   id:               string;
@@ -39,72 +53,73 @@ export interface TransactionInput {
   notes:            string;
 }
 
-// ── Type mapping ──────────────────────────────────────────────────────────────
+// ── Type mapping: Supabase txn_type (lowercase) <-> app TxType (uppercase) ───
 
-// Maps institutional portfolio's rich type to the advise-platform enum
-const TO_DB_TYPE: Record<TxType, string> = {
+const FROM_DB: Record<string, TxType> = {
+  buy:               "BUY",
+  sell:              "SELL",
+  deposit:           "CASH_IN",
+  withdrawal:        "WITHDRAWAL",
+  dividend_cash:     "DIVIDEND",
+  fee:               "FEE",
+  tax:               "TAX",
+  manual_adjustment: "CASH_IN",
+  notional_income:   "INTEREST",
+  transfer_in:       "TRANSFER_IN_CASH",
+  transfer_out:      "TRANSFER_OUT_CASH",
+};
+
+const TO_DB: Partial<Record<TxType, string>> = {
   BUY:                     "buy",
   SELL:                    "sell",
-  DIVIDEND:                "dividend",
-  INTEREST:                "interest",
-  FEE:                     "fee",
-  TAX:                     "fee",
-  CASH_IN:                 "contribution",
-  CONTRIBUTION:            "contribution",
-  TAX_RELIEF:              "contribution",
+  CASH_IN:                 "deposit",
   CASH_OUT:                "withdrawal",
   WITHDRAWAL:              "withdrawal",
-  BENEFIT_CRYSTALLISATION: "withdrawal",
+  TAX_RELIEF:              "deposit",
+  FEE:                     "fee",
+  DIVIDEND:                "dividend_cash",
+  INTEREST:                "notional_income",
   IN_SPECIE_IN:            "transfer_in",
-  TRANSFER_IN_SPECIE:      "transfer_in",
-  TRANSFER_IN_CASH:        "transfer_in",
   IN_SPECIE_OUT:           "transfer_out",
+  CONTRIBUTION:            "deposit",
+  TRANSFER_IN_SPECIE:      "transfer_in",
   TRANSFER_OUT_SPECIE:     "transfer_out",
+  TRANSFER_IN_CASH:        "transfer_in",
   TRANSFER_OUT_CASH:       "transfer_out",
-  CORPORATE_ACTION_SPLIT:  "buy",
-  CORPORATE_ACTION_MERGE:  "sell",
+  BENEFIT_CRYSTALLISATION: "manual_adjustment",
+  CORPORATE_ACTION_SPLIT:  "manual_adjustment",
+  CORPORATE_ACTION_MERGE:  "manual_adjustment",
+  TAX:                     "tax",
 };
 
-// Maps advise-platform enum back, using metadata.institutional_tx_type if present
-const FROM_DB_TYPE: Record<string, TxType> = {
-  buy:          "BUY",
-  sell:         "SELL",
-  dividend:     "DIVIDEND",
-  interest:     "INTEREST",
-  fee:          "FEE",
-  contribution: "CONTRIBUTION",
-  withdrawal:   "WITHDRAWAL",
-  transfer_in:  "TRANSFER_IN_CASH",
-  transfer_out: "TRANSFER_OUT_CASH",
-};
+// ── DB row → TransactionRow ───────────────────────────────────────────────────
 
-function toTxType(dbType: string, metadata: any): TxType {
-  return (metadata?.institutional_tx_type as TxType) ?? FROM_DB_TYPE[dbType] ?? "BUY";
+function mapRow(tx: any): TransactionRow {
+  return {
+    id:               tx.id,
+    wrapper_id:       tx.account_id,
+    transaction_type: FROM_DB[tx.txn_type] ?? "CASH_IN",
+    trade_date:       tx.trade_date,
+    asset_name:       tx.instruments?.name ?? "",
+    isin:             tx.instruments?.isin ?? null,
+    units:            tx.quantity   != null ? parseFloat(tx.quantity)   : null,
+    price:            tx.price_quote != null
+      ? parseFloat(tx.price_quote) / (tx.price_scale ?? 1)
+      : null,
+    net_amount:       parseFloat(tx.gross_amount_gbp) ?? 0,
+    fees:             parseFloat(tx.fees_gbp) ?? 0,
+    notes:            tx.notes ?? "",
+    is_book_over:     false,
+  };
 }
 
-// ── Instrument lookup / create ────────────────────────────────────────────────
+const TX_SELECT = `
+  id, txn_type, trade_date, quantity, price_quote, price_scale,
+  gross_amount_gbp, fees_gbp, notes, account_id,
+  instruments(name, isin)
+`;
 
-async function resolveInstrumentId(isin: string, name: string): Promise<string | null> {
-  if (!isin) return null;
-
-  const { data: existing } = await supabase
-    .from("instruments")
-    .select("id")
-    .eq("isin", isin)
-    .maybeSingle();
-
-  if (existing) return existing.id;
-
-  const { data: created } = await supabase
-    .from("instruments")
-    .insert({ isin, name, currency: "GBP" })
-    .select("id")
-    .single();
-
-  return created?.id ?? null;
-}
-
-// ── Read ──────────────────────────────────────────────────────────────────────
+// ── useTransactions ───────────────────────────────────────────────────────────
 
 export function useTransactions(
   clientId:   string,
@@ -117,132 +132,152 @@ export function useTransactions(
     queryFn:   async () => {
       if (!isSupabaseConfigured) return { transactions: [], total: 0 };
 
-      // Build base query — filter by specific account or all client accounts
-      let query = supabase
-        .from("transactions")
-        .select(`
-          id, account_id, transaction_type, quantity, price, amount,
-          settled_at, description, reference, metadata,
-          instruments(isin, name),
-          accounts!inner(client_id)
-        `, { count: "exact" })
-        .order("settled_at", { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
+      // Resolve account IDs for this client/wrapper
+      let accountIds: string[];
       if (wrapperId) {
-        query = query.eq("account_id", wrapperId);
+        accountIds = [wrapperId];
       } else {
-        query = query.eq("accounts.client_id", clientId);
+        const { data: accts } = await supabase
+          .from("accounts")
+          .select("id")
+          .eq("portfolio_id", clientId);
+        accountIds = (accts ?? []).map((a: any) => a.id);
       }
 
-      const { data, count, error } = await query;
+      if (accountIds.length === 0) return { transactions: [], total: 0 };
+
+      const from = page * pageSize;
+      const to   = from + pageSize - 1;
+
+      const { data, error, count } = await supabase
+        .from("transactions")
+        .select(TX_SELECT, { count: "exact" })
+        .in("account_id", accountIds)
+        .order("trade_date",  { ascending: false })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
       if (error) throw error;
 
-      const transactions: TransactionRow[] = (data as any[]).map((t) => ({
-        id:               t.id,
-        wrapper_id:       t.account_id,
-        transaction_type: toTxType(t.transaction_type, t.metadata),
-        trade_date:       t.settled_at ? (t.settled_at as string).slice(0, 10) : "",
-        asset_name:       t.description ?? t.instruments?.name ?? "",
-        isin:             t.instruments?.isin ?? null,
-        units:            t.quantity ?? null,
-        price:            t.price ?? null,
-        net_amount:       t.amount ?? 0,
-        fees:             t.metadata?.fees ?? 0,
-        notes:            t.reference ?? "",
-        is_book_over:     t.metadata?.is_book_over ?? false,
-      }));
-
-      return { transactions, total: count ?? 0 };
+      return {
+        transactions: (data as any[]).map(mapRow),
+        total:        count ?? (data as any[]).length,
+      };
     },
-    staleTime: 0,
+    staleTime:        0,
     placeholderData: (prev) => prev,
   });
 }
 
-// ── Add ───────────────────────────────────────────────────────────────────────
+// ── useAddTransaction ─────────────────────────────────────────────────────────
 
 export function useAddTransaction(clientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: TransactionInput) => {
-      const instrumentId = await resolveInstrumentId(input.isin, input.asset_name);
+      if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+
+      // Resolve instrument_id from ISIN if provided
+      let instrument_id: string | null = null;
+      if (input.isin?.trim()) {
+        const { data: inst } = await supabase
+          .from("instruments")
+          .select("id")
+          .eq("isin", input.isin.trim())
+          .maybeSingle();
+        instrument_id = inst?.id ?? null;
+      }
+
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id ?? null;
 
       const { data, error } = await supabase
         .from("transactions")
         .insert({
-          account_id:       input.wrapper_id,
-          instrument_id:    instrumentId,
-          transaction_type: TO_DB_TYPE[input.transaction_type],
-          quantity:         input.units     ? parseFloat(input.units)      : null,
-          price:            input.price     ? parseFloat(input.price)      : null,
-          amount:           parseFloat(input.net_amount) || 0,
-          description:      input.asset_name || null,
-          reference:        input.notes     || null,
-          settled_at:       input.trade_date || null,
-          metadata: {
-            institutional_tx_type: input.transaction_type,
-            fees:         parseFloat(input.fees) || 0,
-            is_book_over: false,
-          },
+          account_id:         input.wrapper_id,
+          instrument_id,
+          txn_type:           TO_DB[input.transaction_type] ?? "deposit",
+          trade_date:         input.trade_date,
+          quantity:           input.units  ? parseFloat(input.units)  : null,
+          price_quote:        input.price  ? parseFloat(input.price)  : null,
+          price_currency:     "GBP",
+          price_scale:        input.price  ? 1                        : null,
+          fx_rate_to_gbp:     1.0,
+          gross_amount_gbp:   parseFloat(input.net_amount) || 0,
+          fees_gbp:           parseFloat(input.fees) || 0,
+          sdrt_gbp:           0,
+          tax_gbp:            0,
+          notes:              input.notes || null,
+          affects_cost_basis: false,
+          created_by:         userId,
+          updated_by:         userId,
         })
-        .select()
+        .select(TX_SELECT)
         .single();
 
       if (error) throw error;
-      return data;
+      return mapRow(data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions", clientId] }),
   });
 }
 
-// ── Update ────────────────────────────────────────────────────────────────────
+// ── useUpdateTransaction ──────────────────────────────────────────────────────
 
 export function useUpdateTransaction(clientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: TransactionInput }) => {
-      const instrumentId = await resolveInstrumentId(input.isin, input.asset_name);
+      if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+
+      let instrument_id: string | null = null;
+      if (input.isin?.trim()) {
+        const { data: inst } = await supabase
+          .from("instruments")
+          .select("id")
+          .eq("isin", input.isin.trim())
+          .maybeSingle();
+        instrument_id = inst?.id ?? null;
+      }
+
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id ?? null;
 
       const { data, error } = await supabase
         .from("transactions")
         .update({
-          instrument_id:    instrumentId,
-          transaction_type: TO_DB_TYPE[input.transaction_type],
+          account_id:       input.wrapper_id,
+          instrument_id,
+          txn_type:         TO_DB[input.transaction_type] ?? "deposit",
+          trade_date:       input.trade_date,
           quantity:         input.units  ? parseFloat(input.units)  : null,
-          price:            input.price  ? parseFloat(input.price)  : null,
-          amount:           parseFloat(input.net_amount) || 0,
-          description:      input.asset_name || null,
-          reference:        input.notes      || null,
-          settled_at:       input.trade_date || null,
-          metadata: {
-            institutional_tx_type: input.transaction_type,
-            fees:         parseFloat(input.fees) || 0,
-            is_book_over: false,
-          },
+          price_quote:      input.price  ? parseFloat(input.price)  : null,
+          price_currency:   "GBP",
+          price_scale:      input.price  ? 1                        : null,
+          gross_amount_gbp: parseFloat(input.net_amount) || 0,
+          fees_gbp:         parseFloat(input.fees) || 0,
+          notes:            input.notes || null,
+          updated_by:       userId,
         })
         .eq("id", id)
-        .select()
+        .select(TX_SELECT)
         .single();
 
       if (error) throw error;
-      return data;
+      return mapRow(data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions", clientId] }),
   });
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
+// ── useDeleteTransaction ──────────────────────────────────────────────────────
 
 export function useDeleteTransaction(clientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("transactions")
-        .delete()
-        .eq("id", id);
-
+      if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+      const { error } = await supabase.from("transactions").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions", clientId] }),

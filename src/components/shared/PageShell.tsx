@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, Upload, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, FileText, TrendingUp, Receipt, Upload, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 interface PageShellProps {
@@ -8,15 +8,23 @@ interface PageShellProps {
 }
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Clients",   href: "/clients",   icon: Users },
-  { label: "Import",    href: "/import",    icon: Upload },
+  { label: "Dashboard",        href: "/dashboard",        icon: LayoutDashboard },
+  { label: "Clients",          href: "/clients",          icon: Users },
+  { label: "Portfolios",       href: "/portfolios",       icon: Briefcase },
+  { label: "Reporting",        href: "/reporting",        icon: FileText },
+  { label: "Analytics",        href: "/analytics",        icon: TrendingUp },
+  { label: "Costs & Charges",  href: "/costs-and-charges", icon: Receipt },
+  { label: "Import",           href: "/import",           icon: Upload },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
-  dashboard: "Dashboard",
-  clients:   "Clients",
-  import:    "Import",
+  dashboard:          "Dashboard",
+  clients:            "Clients",
+  portfolios:         "Portfolios",
+  reporting:          "Reporting",
+  analytics:          "Analytics",
+  "costs-and-charges": "Costs & Charges",
+  import:             "Import",
 };
 
 function getAdviser() {
