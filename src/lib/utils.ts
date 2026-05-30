@@ -14,6 +14,15 @@ export function fmt(value: number, currency = "GBP"): string {
   }).format(value);
 }
 
+export function fmtPrice(value: number, currency = "GBP"): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(value);
+}
+
 export function fmtDecimal(value: number, decimals = 2): string {
   return new Intl.NumberFormat("en-GB", {
     minimumFractionDigits: decimals,

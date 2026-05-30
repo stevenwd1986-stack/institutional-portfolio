@@ -52,7 +52,7 @@ export function useHoldings(clientId: string) {
             isin:            h.instruments?.isin ?? null,
             asset_class:     h.instruments?.asset_class ?? "EQUITY",
             units:           h.units ?? 0,
-            price:           h.current_price ?? 0,
+            price:           h.current_price > 0 ? h.current_price : ((h.units ?? 0) > 0 ? (h.current_value ?? 0) / h.units : 0),
             market_value:    h.current_value ?? 0,
             cost_basis:      h.cost_basis ?? 0,
             unrealised_gain: gain,

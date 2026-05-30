@@ -5,7 +5,7 @@ import { PageShell }                  from "../components/shared/PageShell";
 import { PlatformLogo, FundManagerLogo } from "../components/shared/PlatformLogo";
 import { useWrapper }                 from "../hooks/useWrapper";
 import { useClient }                  from "../hooks/useClient";
-import { fmt, fmtPct }                from "../lib/utils";
+import { fmt, fmtPct, fmtPrice }      from "../lib/utils";
 import { cn }                         from "../lib/utils";
 import { AddTransactionDrawer }       from "../components/client/AddTransactionDrawer";
 import type { BondContext }           from "../components/client/AddTransactionDrawer";
@@ -115,7 +115,7 @@ function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
                   {h.units.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
                 </td>
                 <td className="px-4 py-3.5 text-right text-xs text-slate-500 tabular-nums">
-                  {fmt(h.price)}
+                  {fmtPrice(h.price)}
                 </td>
                 <td className="px-4 py-3.5 text-right text-sm text-[#0F172A] font-semibold tabular-nums">
                   {fmt(h.market_value)}

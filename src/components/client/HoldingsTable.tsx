@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useHoldings }       from "../../hooks/useHoldings";
-import { cn, fmt }           from "../../lib/utils";
+import { cn, fmt, fmtPrice } from "../../lib/utils";
 import { ChevronDown }       from "lucide-react";
 import { FundManagerLogo }   from "../shared/PlatformLogo";
 
@@ -99,7 +99,7 @@ export function HoldingsTable({ clientId }: { clientId: string }) {
                       {h.units.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
                     </td>
                     <td className="px-4 py-3.5 text-right text-xs text-slate-500 tabular-nums">
-                      {fmt(h.price)}
+                      {fmtPrice(h.price)}
                     </td>
                     <td className="px-4 py-3.5 text-right text-sm text-[#0F172A] font-medium tabular-nums">
                       {fmt(h.market_value)}
